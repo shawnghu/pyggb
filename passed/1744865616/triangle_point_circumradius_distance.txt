@@ -1,0 +1,11 @@
+# Distance from a point to triangle circumradius center
+point :  -> A
+const int 6 -> side1
+point_pm : A side1 -> B
+const int 7 -> side2
+const int 9 -> side3
+point_pmpm : A side2 B side3 -> C
+circle_ppp : A B C -> circ
+center_c : circ -> center
+distance_pp : B center -> dist_to_center
+measure : dist_to_center -> result

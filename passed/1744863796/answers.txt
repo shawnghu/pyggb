@@ -1,0 +1,5 @@
+rectangle_diagonal_length.txt: 5.5621
+isosceles_triangle_angle_bisector_length.txt: 7.6244
+triangle_incircle_radius.txt: 1.633
+triangle_median_length.txt: 5.8949
+pentagon_diagonal_ratio.txt: 1.618

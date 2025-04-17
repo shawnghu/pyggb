@@ -1,0 +1,12 @@
+# Triangle midsegment length measurement
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 6 -> side2
+const int 8 -> side3
+point_pmpm : A side2 B side3 -> C
+midpoint_pp : A B -> M
+midpoint_pp : A C -> N
+segment_pp : M N -> midsegment
+distance_pp : M N -> midseg_length
+measure : midseg_length -> result

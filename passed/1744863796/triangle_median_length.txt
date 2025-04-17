@@ -1,0 +1,10 @@
+# Triangle with sides 7,9,11 measure length of median from vertex A
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 9 -> side2
+const int 11 -> side3
+point_pmpm : A side2 B side3 -> C
+midpoint_pp : B C -> M
+distance_pp : A M -> median_length
+measure : median_length -> result

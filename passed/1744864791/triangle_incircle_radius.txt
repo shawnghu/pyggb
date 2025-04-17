@@ -1,0 +1,20 @@
+# Triangle with fixed sides measuring inradius
+point :  -> A
+const int 4 -> side1
+point_pm : A side1 -> B
+const int 5 -> side2
+const int 6 -> side3
+point_pmpm : A side2 B side3 -> C
+# Construct angle bisectors
+angular_bisector_ppp : B A C -> bisectorA
+angular_bisector_ppp : A B C -> bisectorB
+# Find incenter as intersection of bisectors
+intersect_ll : bisectorA bisectorB -> I
+# Construct side line AB
+line_pp : A B -> side_AB
+# Construct orthogonal line from incenter to side AB
+orthogonal_line_pl : I side_AB -> perpendicular
+intersect_ll : perpendicular side_AB -> H
+# Measure inradius
+distance_pp : I H -> inradius
+measure : inradius -> result

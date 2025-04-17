@@ -1,0 +1,17 @@
+# Cyclic quadrilateral and ratio of products of distances from intersection of diagonals
+point :  -> A
+point :  -> B
+point :  -> C
+circle_ppp : A B C -> circle1
+point_c : circle1 -> D
+segment_pp : A C -> diag1
+segment_pp : B D -> diag2
+intersect_ll : diag1 diag2 -> P
+distance_pp : P A -> dist_PA
+distance_pp : P C -> dist_PC
+product_mm : dist_PA dist_PC -> prod1
+distance_pp : P B -> dist_PB
+distance_pp : P D -> dist_PD
+product_mm : dist_PB dist_PD -> prod2
+ratio_mm : prod1 prod2 -> final_ratio
+measure : final_ratio -> result

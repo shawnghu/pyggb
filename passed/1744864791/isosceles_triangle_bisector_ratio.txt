@@ -1,0 +1,16 @@
+# Construct isosceles triangle with sides 7,7,10, measure bisector length from apex
+point :  -> A
+const int 10 -> base_length
+point_pm : A base_length -> B
+const int 7 -> side_length
+point_pmpm : A side_length B side_length -> C
+# Create angle bisector from apex C
+angular_bisector_ppp : A C B -> bisector
+# Construct base line AB
+line_pp : A B -> base_line
+# Find intersection D of bisector and base AB
+intersect_ll : bisector base_line -> D
+# Measure bisector length
+distance_pp : C D -> bisector_length
+# Output final measurement
+measure : bisector_length -> result

@@ -11,7 +11,7 @@ openai.api_key = api_key
 
 client = openai.OpenAI()
 
-def generate_response(prompt, context=None, model="gpt-4.1-mini"):
+def generate_response(prompt, context=None, model="gpt-4.1-mini", num_files=10):
     try:
         messages = []
         
@@ -20,7 +20,7 @@ def generate_response(prompt, context=None, model="gpt-4.1-mini"):
             messages.append({"role": "system", "content": context})
         
         # Add user message
-        messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": prompt % num_files})
         
         response = client.chat.completions.create(
             model=model,
@@ -31,7 +31,7 @@ def generate_response(prompt, context=None, model="gpt-4.1-mini"):
         print(f"Error generating response: {e}")
         return None
 
-def create_commands_context():
+def create_context():
     context = "Here are the relevant files:\n\n"
     
     for filename in ["commands.py", "geo_types.py", "measure_test.py", "random_constr.py", "golden_ratio.txt", \
@@ -54,6 +54,7 @@ def create_commands_context():
     context += "Also note that commands.py defines the syntax of valid commands. A file containing syntactically invalid commands will automatically fail, so this is critical. In particular, note that the commands are of the form\n"
     context += "`<command> : <possible vars> -> <newly constructed var>`\n"
     context += "and in particular, Python code is not part of the command language. This is important to remember.\n"
+    context += "Note also that the command language cannot make use of numerical literals directly. Any time a numerical value is needed, it must be assigned to a variable using the 'const int' or 'const float' commands.\n"
     context += "Note furthermore that the ONLY valid commands are the ones defined in commands.py, and that any other commands will result in the construction being rejected.\n"
     context += "For example, there is no command simply named 'segment', but there is a command 'segment_pp' which constructs a segment from two points.\n"
     context += "Explicitly, the only valid commands are: \n"
@@ -73,12 +74,9 @@ def create_commands_context():
     return context
 
 
+context = create_context()
 
-
-# Example usage:
-context = create_commands_context()
-
-prompt = """Please generate 10 new geometric constructions which satisfy the criteria described in the system prompt.
+prompt = """Please generate %d new geometric constructions which satisfy the criteria described in the system prompt.
 Format each construction as follows:
 FILE_START: construction_name_1.txt
 [construction content]
@@ -105,7 +103,8 @@ def handle_response(response):
         with open(f"generated_constructions/{filename}", 'w') as f:
             f.write(content)
 
-response = generate_response(prompt, context=context)
-# print(response)
-handle_response(response)
-# print(response)
+for i in range(1): 
+    response = generate_response(prompt, context=context, num_files=100)
+    # print(response)
+    handle_response(response)
+    # print(response)

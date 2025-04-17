@@ -1,0 +1,11 @@
+# Regular pentagon side to circumradius ratio
+point :  -> A
+const int 1 -> side_length
+point_pm : A side_length -> B
+const int 5 -> num_sides
+polygon_ppi : A B num_sides -> pentagon AB BC CD DE EA C D E
+circle_ppp : A B C -> circ
+distance_pp : A B -> side
+radius_c : circ -> radius
+ratio_mm : radius side -> ratio
+measure : ratio -> result

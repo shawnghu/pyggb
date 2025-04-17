@@ -1,0 +1,13 @@
+# Ratio of triangle area to median length
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 8 -> side2
+const int 9 -> side3
+point_pmpm : A side2 B side3 -> C
+area : A B C -> area
+midpoint_pp : B C -> M
+segment_pp : A M -> median
+distance_pp : A M -> median_length
+ratio_mm : area median_length -> ratio
+measure : ratio -> result

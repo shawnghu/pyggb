@@ -1,0 +1,11 @@
+# Right triangle measuring the hypotenuse length
+point :  -> A
+const int 3 -> leg1
+point_pm : A leg1 -> B
+const int 4 -> leg2
+point_pmpm : A leg2 B leg1 -> C
+segment_pp : A B -> side_AB
+segment_pp : B C -> side_BC
+segment_pp : A C -> hypotenuse
+distance_pp : A C -> hyp_len
+measure : hyp_len -> result

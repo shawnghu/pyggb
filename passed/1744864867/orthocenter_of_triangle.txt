@@ -1,0 +1,9 @@
+point :  -> A
+point :  -> B
+point :  -> C
+line_pp : A B -> alt_AB
+line_pp : B C -> alt_BC
+line_pp : A C -> alt_AC
+intersect_ll : alt_AB alt_BC -> H
+distance_pp : H H -> orthocenter_dist
+measure : orthocenter_dist -> orthocenter_measure

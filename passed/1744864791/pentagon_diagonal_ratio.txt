@@ -1,0 +1,9 @@
+# Ratio of diagonal to side in regular pentagon
+point :  -> A
+point :  -> B
+const int 5 -> sides
+polygon_ppi : A B sides -> pentagon AB BC CD DE EA C D E
+distance_pp : A B -> side_length
+distance_pp : A C -> diagonal_length
+ratio_mm : diagonal_length side_length -> ratio
+measure : ratio -> result

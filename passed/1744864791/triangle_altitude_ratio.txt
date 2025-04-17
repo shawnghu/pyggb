@@ -1,0 +1,13 @@
+# Triangle measuring ratio of altitude to base
+point :  -> A
+const int 10 -> base_length
+point_pm : A base_length -> B
+const int 8 -> side_length
+point_pmpm : A side_length B side_length -> C
+line_pp : A B -> base_line
+orthogonal_line_pl : C base_line -> altitude_line
+intersect_ll : base_line altitude_line -> H
+distance_pp : C H -> height
+distance_pp : A B -> base
+ratio_mm : height base -> ratio
+measure : ratio -> result

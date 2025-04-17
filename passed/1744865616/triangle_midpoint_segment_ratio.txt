@@ -1,0 +1,13 @@
+# Triangle midpoint segment to side ratio
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 6 -> side2
+const int 8 -> side3
+point_pmpm : A side2 B side3 -> C
+midpoint_pp : B C -> M
+segment_pp : A M -> median
+distance_pp : A M -> med_length
+distance_pp : A B -> side_length
+ratio_mm : med_length side_length -> ratio
+measure : ratio -> result

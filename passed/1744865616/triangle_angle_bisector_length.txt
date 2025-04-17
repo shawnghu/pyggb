@@ -1,0 +1,12 @@
+# Triangle with sides 7, 9, 10; measuring angle bisector
+const int 7 -> side1
+const int 9 -> side2
+point :  -> A
+point_pm : A side1 -> B
+const int 10 -> side3
+point_pmpm : A side2 B side3 -> C
+angular_bisector_ppp : B A C -> bisectorA
+line_pp : B C -> sideBC
+intersect_ll : bisectorA sideBC -> D
+distance_pp : A D -> bisector_length
+measure : bisector_length -> result

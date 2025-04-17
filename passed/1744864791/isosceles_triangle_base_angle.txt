@@ -1,0 +1,12 @@
+# Isosceles triangle measuring base angles equality
+point :  -> A
+const int 8 -> leg_length
+point_pm : A leg_length -> B
+point_pmpm : A leg_length B leg_length -> C
+line_pp : A B -> base_line
+line_pp : A C -> leg1
+line_pp : B C -> leg2
+angle_ppp : B A C -> angle_A
+angle_ppp : A B C -> angle_B
+are_congruent_aa : angle_A angle_B -> equal_angles
+measure : equal_angles -> result

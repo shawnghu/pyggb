@@ -143,11 +143,7 @@ def check_constructions(directory_path, verbose=True):
                 if problem_line:
                     print(f"  Problematic line: {problem_line}")
     
-    # Print summary statistics
-    print("\nSUMMARY:")
-    print(f"Total files examined: {total_files}")
-    print(f"Syntactically valid files: {len(valid_files)} ({len(valid_files)/total_files*100:.1f}%)")
-    print(f"Syntactically invalid files: {len(invalid_files)} ({len(invalid_files)/total_files*100:.1f}%)")
+
     
     # Add semantic validation statistics
     if valid_files:
@@ -201,6 +197,12 @@ def check_constructions(directory_path, verbose=True):
                     
             except Exception as e:
                 print(f"  Error reading file: {e}")
+
+        # Print summary statistics
+    print("\nSUMMARY:")
+    print(f"Total files examined: {total_files}")
+    print(f"Syntactically valid files: {len(valid_files)} ({len(valid_files)/total_files*100:.1f}%)")
+    print(f"Syntactically invalid files: {len(invalid_files)} ({len(invalid_files)/total_files*100:.1f}%)")
     
     return {
         "total_files": total_files,

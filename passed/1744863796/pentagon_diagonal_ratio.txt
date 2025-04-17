@@ -1,0 +1,10 @@
+# Regular pentagon, measure ratio of diagonal length to side length
+point :  -> A
+const int 5 -> num_sides
+const int 7 -> side_len
+point_pm : A side_len -> B
+polygon_ppi : A B num_sides -> poly1 AB BC CD DE EA C D E
+distance_pp : A C -> diagonal_length
+distance_pp : A B -> side_length
+ratio_mm : diagonal_length side_length -> ratio
+measure : ratio -> result

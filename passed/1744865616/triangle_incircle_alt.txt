@@ -1,0 +1,15 @@
+# Triangle incenter and incircle radius alternative construction
+point :  -> A
+const int 7 -> dist1
+point_pm : A dist1 -> B
+const int 9 -> dist2
+const int 6 -> dist3
+point_pmpm : A dist2 B dist3 -> C
+angular_bisector_ppp : B A C -> bisector1
+angular_bisector_ppp : A B C -> bisector2
+intersect_ll : bisector1 bisector2 -> I
+line_pp : A B -> sideAB
+orthogonal_line_pl : I sideAB -> perpendicular
+intersect_ll : perpendicular sideAB -> H
+distance_pp : I H -> inradius
+measure : inradius -> result

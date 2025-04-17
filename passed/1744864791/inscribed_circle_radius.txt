@@ -1,0 +1,14 @@
+# Triangle with incircle radius measurement
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 9 -> side2
+point_pmpm : A side2 B side1 -> C
+angular_bisector_ppp : B A C -> bisectorA
+angular_bisector_ppp : A B C -> bisectorB
+intersect_ll : bisectorA bisectorB -> I
+line_pp : A B -> side_AB
+orthogonal_line_pl : I side_AB -> perpendicular
+intersect_ll : perpendicular side_AB -> H
+distance_pp : I H -> inradius
+measure : inradius -> result

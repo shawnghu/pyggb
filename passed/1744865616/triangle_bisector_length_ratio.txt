@@ -1,0 +1,14 @@
+# Ratio of angle bisector length to side in triangle
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 8 -> side2
+const int 9 -> side3
+point_pmpm : A side2 B side3 -> C
+angular_bisector_ppp : B A C -> bisector
+line_pp : B C -> BC_line
+intersect_ll : bisector BC_line -> D
+distance_pp : A D -> bisector_length
+distance_pp : A B -> side_length
+ratio_mm : bisector_length side_length -> ratio
+measure : ratio -> result

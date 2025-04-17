@@ -1,0 +1,13 @@
+# Right triangle measuring ratio of altitude to leg
+point :  -> A
+const int 6 -> leg1
+point_pm : A leg1 -> B
+const int 8 -> leg2
+point_pmpm : A leg2 B leg1 -> C
+line_pp : A B -> base_line
+orthogonal_line_pl : C base_line -> altitude_line
+intersect_ll : base_line altitude_line -> H
+distance_pp : C H -> altitude
+distance_pp : A B -> base_side
+ratio_mm : altitude base_side -> ratio
+measure : ratio -> result

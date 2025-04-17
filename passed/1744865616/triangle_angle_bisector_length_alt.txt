@@ -1,0 +1,12 @@
+# Triangle angle bisector length alternate
+point :  -> A
+const int 6 -> side1
+point_pm : A side1 -> B
+const int 7 -> side2
+const int 8 -> side3
+point_pmpm : A side2 B side3 -> C
+angular_bisector_ppp : B A C -> bisector
+line_pp : B C -> sideBC_line
+intersect_ll : bisector sideBC_line -> D
+distance_pp : A D -> bisector_length
+measure : bisector_length -> result

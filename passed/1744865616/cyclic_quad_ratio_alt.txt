@@ -1,0 +1,17 @@
+# Cyclic quadrilateral power of point ratio
+point :  -> A
+point :  -> B
+point :  -> C
+circle_ppp : A B C -> circ
+point_c : circ -> D
+segment_pp : A C -> diagAC
+segment_pp : B D -> diagBD
+intersect_ll : diagAC diagBD -> P
+distance_pp : P A -> distPA
+distance_pp : P C -> distPC
+distance_pp : P B -> distPB
+distance_pp : P D -> distPD
+product_mm : distPA distPC -> prod1
+product_mm : distPB distPD -> prod2
+ratio_mm : prod1 prod2 -> final_ratio
+measure : final_ratio -> result

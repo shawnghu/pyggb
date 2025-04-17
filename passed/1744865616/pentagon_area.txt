@@ -1,0 +1,8 @@
+# Regular pentagon area measurement
+point :  -> A
+const int 4 -> side_length
+point_pm : A side_length -> B
+const int 5 -> num_sides
+polygon_ppi : A B num_sides -> pentagon AB BC CD DE EA C D E
+area_P : pentagon -> area_pent
+measure : area_pent -> result

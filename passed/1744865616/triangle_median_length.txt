@@ -1,0 +1,11 @@
+# Triangle median length measure
+point :  -> A
+const int 5 -> side1
+point_pm : A side1 -> B
+const int 7 -> side2
+const int 8 -> side3
+point_pmpm : A side2 B side3 -> C
+midpoint_pp : B C -> M
+segment_pp : A M -> median_AM
+distance_pp : A M -> median_length
+measure : median_length -> result

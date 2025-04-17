@@ -1,0 +1,16 @@
+# Ratio of median to angle bisector length in triangle
+point :  -> A
+const int 7 -> side1
+point_pm : A side1 -> B
+const int 8 -> side2
+const int 9 -> side3
+point_pmpm : A side2 B side3 -> C
+midpoint_pp : B C -> M
+segment_pp : A M -> median
+angular_bisector_ppp : B A C -> bisector
+line_pp : B C -> BC_line
+intersect_ll : bisector BC_line -> D
+distance_pp : A D -> bisector_length
+distance_pp : A M -> median_length
+ratio_mm : median_length bisector_length -> ratio
+measure : ratio -> result

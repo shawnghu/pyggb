@@ -1,0 +1,12 @@
+# Triangle excircle radius (approximate)
+point :  -> A
+const int 6 -> d1
+point_pm : A d1 -> B
+const int 7 -> d2
+const int 8 -> d3
+point_pmpm : A d2 B d3 -> C
+# Use angle bisector and circle for excircle approx (simplified)
+angular_bisector_ppp : B A C -> bisector
+circle_ppp : A B C -> circ
+radius_c : circ -> radius
+measure : radius -> result
