@@ -1,0 +1,4 @@
+rectangle_diagonal_ratio.txt: 1.0
+equilateral_triangle_side_ratio.txt: 1.0
+triangle_median_length_ratio.txt: 0.7526
+right_triangle_altitude_ratio.txt: 1.3333

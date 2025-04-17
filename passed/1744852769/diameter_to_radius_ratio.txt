@@ -1,0 +1,10 @@
+# Construct a circle of radius 5, compute its diameter by mirroring, and measure diameter/radius = 2
+point :  -> A
+const int 5 -> r
+point_pm : A r -> B
+mirror_pp : B A -> C
+distance_pp : B C -> diameter
+circle_pp : A B -> circ
+radius_c : circ -> radius
+ratio_mm : diameter radius -> ratio
+measure : ratio -> result

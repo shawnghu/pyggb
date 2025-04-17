@@ -1,0 +1,20 @@
+# Square and ratio of diagonal to side length
+point :  -> A
+const int 1 -> side_length
+point_pm : A side_length -> B
+const int 1 -> dummy
+segment_pp : A B -> side_AB
+# Create square by rotating side AB by 90 degrees around B to get C
+rotate_pAp : A 1.57079632679 B -> C
+segment_pp : B C -> side_BC
+rotate_pAp : B 1.57079632679 C -> D
+segment_pp : C D -> side_CD
+segment_pp : D A -> side_DA
+# Measure diagonal AC
+distance_pp : A C -> diagonal
+# Measure side AB
+distance_pp : A B -> side
+# Ratio diagonal / side
+ratio_mm : diagonal side -> ratio
+# Final measurement
+measure : ratio -> result

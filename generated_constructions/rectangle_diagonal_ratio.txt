@@ -1,0 +1,36 @@
+# Rectangle and ratio of diagonal to side length
+point :  -> A
+const int 2 -> length
+const int 1 -> width
+point_pm : A length -> B
+rotate_pAp : A 1.57079632679 B -> C
+segment_pp : B C -> BC
+point_pm : C width -> D
+segment_pp : C D -> CD
+segment_pp : D A -> DA
+distance_pp : A D -> side1
+distance_pp : A B -> side2
+segment_pp : A D -> side1_seg
+segment_pp : A B -> side2_seg
+distance_pp : A D -> height
+distance_pp : A C -> diagonal
+distance_pp : B D -> diagonal_BD
+distance_pp : A C -> diagonal_AC
+distance_pp : B D -> diagonal_BD
+distance_pp : A D -> side1
+distance_pp : A B -> side2
+distance_pp : A D -> width
+distance_pp : A B -> length
+distance_pp : A D -> side1
+distance_pp : A B -> side2
+distance_pp : A D -> s1
+distance_pp : A B -> s2
+distance_pp : A C -> diag
+distance_pp : B D -> diag2
+segment_pp : A C -> diag_seg
+distance_pp : A C -> diag
+distance_pp : B D -> diag2
+distance_pp : A C -> diagonal
+distance_pp : B D -> diagonal2
+ratio_mm : diagonal side1 -> ratio
+measure : ratio -> result

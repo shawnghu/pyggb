@@ -3,6 +3,8 @@ import sys
 import traceback
 import numpy as np
 import shutil
+import time
+import argparse
 from collections import Counter
 from random_constr import Construction
 
@@ -25,6 +27,7 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
     except Exception as e:
         if verbose:
             print(f"Error loading {file_path}: {str(e)}")
+            traceback.print_exc()
         return None
     
     if construction.statement_type != "measure":
@@ -126,7 +129,11 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
         
         # Test the construction
         test_results = test_measure_construction(file_path, num_tests, precision, verbose)
-        
+        if test_results is not None:
+            pass
+            # print(test_results["failed_tests"])
+            # print(test_results["all_values"])
+
         if test_results is None:
             print(f"  Failed to test {filename}")
             results[filename] = {"status": "error", "passed": False}
@@ -158,17 +165,21 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
     
     return results
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python measure_test.py <construction_file|directory> [num_tests]")
-        sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(description="Test geometric constructions")
+    parser.add_argument("path", help="Path to construction file or directory")
+    parser.add_argument("--verbose", action="store_true", help="Print verbose output")
+    parser.add_argument("--num_tests", type=int, default=20, help="Number of tests to run")
+    args = parser.parse_args()
     
-    path = sys.argv[1]
-    num_tests = int(sys.argv[2]) if len(sys.argv) > 2 else 20
-    
-    if os.path.isdir(path):
-        print(f"Processing directory: {path}")
-        results = process_directory(path, num_tests=num_tests)
+    if os.path.isdir(args.path):
+        print(f"Processing directory: {args.path}")
+        # Add timestamp subdirectory to passed_dir
+        timestamp = str(int(time.time()))
+        passed_dir = os.path.join("passed/", timestamp)
+        os.makedirs(passed_dir, exist_ok=True)
+        results = process_directory(args.path, passed_dir=passed_dir, num_tests=args.num_tests, verbose=args.verbose)
         
         # Print summary
         passed = sum(1 for r in results.values() if r.get("status") == "pass")
@@ -177,4 +188,7 @@ if __name__ == "__main__":
         
         print(f"\nSummary: {passed} passed, {failed} failed, {errors} errors")
     else:
-        test_measure_construction(path, num_tests) 
+        test_measure_construction(args.path, args.num_tests, verbose=args.verbose) 
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+# Inscribed angle measurement in circle
+point :  -> A
+point :  -> B
+point :  -> C
+circle_ppp : A B C -> circle1
+point_c : circle1 -> D
+angle_ppp : D A B -> angle_DAB
+measure : angle_DAB -> result

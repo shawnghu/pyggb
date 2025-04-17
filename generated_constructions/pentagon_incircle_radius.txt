@@ -1,0 +1,16 @@
+# Construct regular pentagon and measure its incircle radius
+point :  -> A
+const int 5 -> num_sides
+const int 6 -> side_len
+point_pm : A side_len -> B
+polygon_ppi : A B num_sides -> poly1 AB BC CD DE EA C D E
+circle_ppp : A B C -> circ
+center_c : circ -> center
+line_bisector_pp : A B -> bisector_AB
+line_bisector_pp : B C -> bisector_BC
+intersect_ll : bisector_AB bisector_BC -> incenter
+line_pp : A B -> base
+orthogonal_line_pl : incenter base -> perpendicular
+intersect_ll : perpendicular base -> foot
+distance_pp : incenter foot -> inradius
+measure : inradius -> result

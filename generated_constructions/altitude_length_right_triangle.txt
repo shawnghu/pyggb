@@ -1,0 +1,13 @@
+# Construct right triangle with legs 6 and 8, measure altitude to hypotenuse
+point :  -> A
+const int 6 -> leg1
+point_pm : A leg1 -> B
+const float 1.57079632679 -> angle_90_rad  # 90 degrees in radians
+rotate_pAp : B angle_90_rad A -> C
+const int 8 -> leg2
+point_pm : B leg2 -> C
+line_pp : A B -> base_line
+orthogonal_line_pl : C base_line -> altitude_line
+intersect_ll : base_line altitude_line -> foot
+distance_pp : C foot -> alt_length
+measure : alt_length -> result

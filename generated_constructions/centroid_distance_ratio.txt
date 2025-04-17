@@ -1,0 +1,12 @@
+# Triangle centroid and distance ratio to side
+point :  -> A
+const int 3 -> side1
+point_pm : A side1 -> B
+const int 4 -> side2
+point_pm : A side2 -> C
+midpoint_pp : B C -> M_BC
+segment_pp : A M_BC -> median_AM
+distance_pp : A M_BC -> median_length
+distance_pp : B C -> side_length
+ratio_mm : median_length side_length -> ratio
+measure : ratio -> result

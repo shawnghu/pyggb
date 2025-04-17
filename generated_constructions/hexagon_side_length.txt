@@ -1,0 +1,9 @@
+# Construct regular hexagon starting with two points, measure side length
+point :  -> A
+const int 6 -> num_sides
+const int 7 -> side_length
+point_pm : A side_length -> B
+polygon_ppi : A B num_sides -> hex_poly AB BC CD DE EF FA C D E F
+segment_pp : A B -> side_AB
+distance_pp : A B -> side_len
+measure : side_len -> result

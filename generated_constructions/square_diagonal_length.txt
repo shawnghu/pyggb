@@ -1,0 +1,12 @@
+# Construct a square and measure length of its diagonal
+point :  -> A
+const int 4 -> side
+point_pm : A side -> B
+const float 1.57079632679 -> angle_90_rad  # 90 degrees in radians
+rotate_pAp : B angle_90_rad A -> C
+segment_pp : B C -> side_BC
+rotate_pAp : C angle_90_rad A -> D
+segment_pp : C D -> side_CD
+segment_pp : D A -> side_DA
+distance_pp : A C -> diagonal
+measure : diagonal -> result

@@ -1,0 +1,9 @@
+# Construct equilateral triangle with side 6 and measure circumcircle radius
+point :  -> A
+const int 6 -> side_len
+point_pm : A side_len -> B
+const float 1.0471975512 -> angle_60_rad  # 60 degrees in radians
+rotate_pAp : B angle_60_rad A -> C
+circle_ppp : A B C -> circ
+radius_c : circ -> radius
+measure : radius -> result

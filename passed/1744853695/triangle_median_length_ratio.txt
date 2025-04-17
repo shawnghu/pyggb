@@ -1,0 +1,14 @@
+# Triangle: measure ratio of median length to side length
+point :  -> A
+const int 8 -> side1
+point_pm : A side1 -> B
+const int 7 -> side2
+const int 9 -> side3
+point_pmpm : A side2 B side3 -> C
+segment : A B -> side_AB
+midpoint_pp : B C -> mid_BC
+segment : A mid_BC -> median_A
+distance_pp : A mid_BC -> median_length
+distance_pp : A B -> side_length
+ratio_mm : median_length side_length -> ratio
+measure : ratio -> result

@@ -1,0 +1,10 @@
+# Construct equilateral triangle and measure height
+point :  -> A
+const int 6 -> side
+point_pm : A side -> B
+point_pmpm : A side B side -> C
+line_pp : A B -> base_line
+orthogonal_line_pl : C base_line -> altitude_line
+intersect_ll : base_line altitude_line -> H
+distance_pp : C H -> height
+measure : height -> result

@@ -1,0 +1,9 @@
+# Circle and chord length measurement
+point :  -> O
+const int 5 -> radius_length
+point_pm : O radius_length -> A
+point_c : Circle(O.a, radius_length) -> B
+segment_pp : A B -> chord
+distance_pp : A B -> chord_length
+radius_c : Circle(O.a, radius_length) -> radius
+measure : chord_length -> result

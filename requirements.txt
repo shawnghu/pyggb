@@ -1,0 +1,4 @@
+numpy==2.2.4
+pycairo==1.28.0 # sudo apt-get install libcairo2-dev pkg-config python3-dev
+python-dotenv==1.1.0  # for generator.py
+openai==1.75.0

@@ -1,0 +1,13 @@
+# Construct isosceles triangle with base length 8 and equal legs length 10, measure ratio base/leg
+point :  -> A
+const int 8 -> base_len
+point_pm : A base_len -> B
+const float 1.57079632679 -> angle_90_rad  # 90 degrees in radians
+segment_pp : A B -> base_segment
+midpoint_s : base_segment -> mid
+const int 10 -> leg_len
+point_pm : mid leg_len -> C
+distance_pp : A B -> base
+distance_pp : A C -> leg
+ratio_mm : base leg -> ratio
+measure : ratio -> result

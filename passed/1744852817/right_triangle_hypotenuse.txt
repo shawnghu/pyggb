@@ -1,0 +1,10 @@
+# Construct right triangle and measure hypotenuse length
+point :  -> A
+const int 3 -> leg1
+point_pm : A leg1 -> B
+const int 4 -> leg2
+point_pmpm : A leg2 B leg2 -> C
+# Construct line BC (hypotenuse)
+distance_pp : B C -> hypotenuse
+# Output final measurement
+measure : hypotenuse -> result
