@@ -8,7 +8,9 @@
 - translate_to_nl.py: translate the files in passed/ to natural language -> natural_language_problems/
 - validator.py: quality check the natural language problems by just cross-checking with o4-mini (-> output.jsonl):  (90% success rate)
 - grader.py: grade problems by difficulty (-> graded.jsonl)
-
+    - works with vLLM with tensor parallelism, so best done on a huge server with a bunch of high-memory GPUs
+    - grader_serial.py will work with a single GPU or even CPU, but is up to 100x slower
+    
 ## Core files (inherited from pyggb repo)
 - ggb_expr and other geogebra-related files are not used here.
 - geo_types.py: defines the types, naturally:
