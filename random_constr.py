@@ -67,7 +67,7 @@ class Command:
         for x,o in zip(output_data, self.output_elements):
             if o is not None: o.data = x
 
-    def __str__(self):
+    def __repr__(self):
         inputs_str = ' '.join([x.label for x in self.input_elements])
         outputs_str = ' '.join([x.label if x is not None else "_" for x in self.output_elements])
         return "{} : {} -> {}".format(

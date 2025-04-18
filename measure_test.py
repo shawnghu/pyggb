@@ -42,6 +42,11 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
         try:
             construction.run_commands()
             value = construction.to_measure.value()
+            if value is None:
+                print("Got None value from construction: ")
+                print(construction.nc_commands)
+                print(construction.to_measure)
+                continue
             measurements.append(value)
             if verbose:
                 print(f"Test {i+1}: {value}")

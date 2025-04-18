@@ -1,0 +1,41 @@
+- type annotate commands.py
+
+
+objective is to make constructions randomly.
+but pure randomness probably won't work.
+[x] for starters, names for symbols should definitely not be random.
+[x] secondly, it seems possible to automatically fit the syntax of the commands.
+[x]thirdly, it seems like it should be possible to even make the commands type safe, ie, we can pick a command, we can look at the types of the arguments, and we can pick an argument from a list of options.
+
+without worrying about the MC sampling part right now, assuming all the functions get correctly type annotated:
+for each command get in code the types that it takes and then the types that it returns. 
+for certain commands like poly, may need to do some annoying stuff like add extra args to construct a polygon.
+also need to define a specific behavior for ints... 
+
+a little heuristic needs to be done, also, maybe to see how things start, and/or to prune unused commands from files.
+more generally, maybe ways needed to bias the sorts of commands that get called, so that the resulting commands are sensible. but maybe type checking will automatically do enough of this.
+i think probably randomly constructing several ints and then pruning all the unused ints is going to work.
+that, or, at this point since we're writing code, just redo the language so that int and float literals are possible.
+defining the behavior of some commands with float literals might turn out to be annoying...
+
+de-risk this by writing the original program generator with only a small set of commands, such as the ones used in some example files.
+
+moreover, it seems like we should be able to do some sort of tree thing where we monte carlo sample to grow the construction tree,
+maybe saving time in sampling if it takes too long to sample good constructions when the logic grows
+
+some points of annoyance:
+- need to also impose the constraint that different args are different identifiers, unless it's appropriate for them to be the same (check manually).
+- not clear how to make float literals of appropriate value: mostly these are angles. so maybe just construct things of angle type directly and remove float literals.
+- shouldn't we be seeing constructions of circles with a named radius? 
+- need to make sure that the measure command is always the last command in the construction.(?)
+- starting heuristics, constructing points and defining one numeric literal are too rigid. but i think good enough for now until other more obvious issues are solved.
+- generally improve sampling heuristics, as needed, for variety.
+    - in particular, probably encourage the construction of n-gons for n up to 12.
+    - possibly, allow construction of a point a fixed fraction down a segment, which is common in AIME style constructions. need to define another numeric type like Proportion for this.
+- idea for the numeric literals: construct them on demand in special cases.
+
+(        # Check if return type is a Union
+        if hasattr(return_type, "__origin__") and return_type.__origin__ is Union:
+            # Pick one of the possible return types
+            return_type = random.choice(return_type.__args__))
+seems to be a huge problem, i think we want to keep it a Union, or otherwise just eliminate the existence of Union return types in this set.
