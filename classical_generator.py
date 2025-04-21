@@ -9,6 +9,78 @@ from typing import Dict, List, Set, Tuple, Any, Union, Optional
 # Import the commands module
 import commands
 import geo_types as gt
+from geo_types import MEASURABLE_TYPES
+
+class Node:
+    """A node in the dependency graph representing an identifier."""
+    def __init__(self, identifier: str, command: str = None, value_type: Any = None):
+        self.identifier = identifier
+        self.command = command  # Command that generated this identifier
+        self.value_type = value_type
+        self.parents = []  # Identifiers used as arguments to create this identifier
+        
+    def add_parent(self, parent_node: 'Node'):
+        """Add a parent node (argument used to create this identifier)."""
+        if parent_node not in self.parents:
+            self.parents.append(parent_node)
+            
+    def __repr__(self):
+        parent_ids = [p.identifier for p in self.parents]
+        return f"Node({self.identifier}, command={self.command}, parents={parent_ids})"
+
+class DependencyGraph:
+    """A directed graph tracking identifier dependencies in constructions."""
+    def __init__(self):
+        self.nodes = {}  # Maps identifier to Node object
+        
+    def add_node(self, identifier: str, command: str = None, value_type: Any = None) -> Node:
+        """Add a node to the graph."""
+        if identifier not in self.nodes:
+            self.nodes[identifier] = Node(identifier, command, value_type)
+        return self.nodes[identifier]
+        
+    def add_dependency(self, child_id: str, parent_ids: List[str], command: str):
+        """
+        Add a dependency relationship: child depends on parents through command.
+        If nodes don't exist, they will be created.
+        
+        Args:
+            child_id: Identifier for the child node
+            parent_ids: List of parent identifiers
+            command: The full command string (e.g., "circle_pp : A B -> C")
+        """
+        # Ensure all nodes exist
+        child_node = self.add_node(child_id, command)
+        
+        # Add parents
+        for parent_id in parent_ids:
+            parent_node = self.add_node(parent_id)
+            child_node.add_parent(parent_node)
+    
+    def get_ancestors(self, identifier: str) -> Set[str]:
+        """Get all ancestors (direct and indirect parents) of a node."""
+        if identifier not in self.nodes:
+            return set()
+            
+        ancestors = set()
+        to_process = [self.nodes[identifier]]
+        processed = set()
+        
+        while to_process:
+            current = to_process.pop()
+            if current in processed:
+                continue
+                
+            processed.add(current)
+            for parent in current.parents:
+                ancestors.add(parent.identifier)
+                if parent not in processed:
+                    to_process.append(parent)
+                    
+        return ancestors
+        
+    def __repr__(self):
+        return f"DependencyGraph with {len(self.nodes)} nodes"
 
 class ClassicalGenerator:
     def __init__(self, seed=None):
@@ -29,6 +101,9 @@ class ClassicalGenerator:
         
         # Command sequence
         self.command_sequence = []
+        
+        # Dependency graph
+        self.dependency_graph = None
 
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
@@ -123,12 +198,48 @@ class ClassicalGenerator:
         random.shuffle(command_names)
         
         for cmd_name in command_names:
+            # heuristics for not making boring things
+            if 'minus' in cmd_name:
+                if cmd_name != 'minus_mm':
+                    continue
+                if random.random() < 0.8:
+                    continue
+            if 'sum' in cmd_name:
+                if cmd_name != 'sum_mm':
+                    continue
+                if random.random() < 0.8:
+                    continue
+            if 'ratio' in cmd_name:
+                if random.random() < 0.8:
+                    continue
+            
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
             
             # Special case for commands that create points without parameters
             if cmd_name == 'point_' and len(param_types) == 0:
                 return cmd_name, [], cmd_info['return_type']
+                
+            # Special case for polygon command - needs at least 3 points
+            if cmd_name == 'polygon':
+                # Check if we have at least 3 point identifiers
+                point_identifiers = [
+                    ident for ident, info in self.identifiers.items() 
+                    if self._is_compatible_type(info['type'], gt.Point)
+                ]
+                
+                if len(point_identifiers) < 3:
+                    continue  # Skip polygon command if we don't have enough points
+                
+                # Choose at least 3 and up to 12 unique point identifiers
+                num_points = min(random.randint(3, 12), len(point_identifiers))
+                selected_points = []
+                
+                # Shuffle and pick points
+                random.shuffle(point_identifiers)
+                selected_points = point_identifiers[:num_points]
+                
+                return cmd_name, selected_points, cmd_info['return_type']
                 
             # Skip commands that need parameters if we don't have any identifiers yet
             # (except for numeric parameters which will be auto-generated)
@@ -172,7 +283,7 @@ class ClassicalGenerator:
         
         return f"{cmd_name} : {param_str} -> {result_str}"
 
-    def _handle_return_value(self, return_type) -> List[str]:
+    def _handle_return_value(self, cmd_name: str, param_identifiers: List[str], return_type) -> List[str]:
         """
         Handle the return value of a command.
         Returns a list of identifiers assigned to the return values.
@@ -189,8 +300,18 @@ class ClassicalGenerator:
             for _ in range(num_elements):
                 identifier = self._get_unused_identifier()
                 self.identifiers[identifier] = {'type': element_type}
-                result_identifiers.append(identifier)
                 
+                # Add to dependency graph - this will be done after the full command is created
+                result_identifiers.append(identifier)
+            
+            # Create the full command string to use in the dependency graph
+            full_cmd = self._format_command(cmd_name, param_identifiers, result_identifiers)
+            
+            # Now add dependencies to the graph with the full command
+            if self.dependency_graph:
+                for result_id in result_identifiers:
+                    self.dependency_graph.add_dependency(result_id, param_identifiers, full_cmd)
+            
             return result_identifiers
         else:
             # For single returns or Union returns, use the actual type
@@ -206,6 +327,13 @@ class ClassicalGenerator:
             else:
                 # For concrete types
                 self.identifiers[identifier] = {'type': return_type}
+            
+            # Create the full command string for the dependency graph
+            full_cmd = self._format_command(cmd_name, param_identifiers, [identifier])
+            
+            # Add to dependency graph
+            if self.dependency_graph:
+                self.dependency_graph.add_dependency(identifier, param_identifiers, full_cmd)
                 
             return [identifier]
 
@@ -215,21 +343,33 @@ class ClassicalGenerator:
         
         if const_type == 'int':
             self.identifiers[identifier] = {'type': int}
-            self.command_sequence.append(f"const int {value} -> {identifier}")
+            command = f"const int {value} -> {identifier}"
+            self.command_sequence.append(command)
         elif const_type == 'float':
             self.identifiers[identifier] = {'type': float}
-            self.command_sequence.append(f"const float {value} -> {identifier}")
+            command = f"const float {value} -> {identifier}"
+            self.command_sequence.append(command)
+        
+        # Add to dependency graph
+        if self.dependency_graph:
+            self.dependency_graph.add_dependency(identifier, [], command)
             
         return identifier
 
     def generate_construction(self, num_commands: int = 5) -> List[str]:
         """Generate a sequence of commands to form a valid construction."""
+        # Initialize the dependency graph
+        self.dependency_graph = DependencyGraph()
         commands_added = 0
         
         # We need to start with a point or two
         initial_point = self._get_unused_identifier()
         self.identifiers[initial_point] = {'type': gt.Point}
-        self.command_sequence.append(f"point_ : -> {initial_point}")
+        initial_cmd = f"point_ : -> {initial_point}"
+        self.command_sequence.append(initial_cmd)
+        
+        # Add initial point to dependency graph
+        self.dependency_graph.add_dependency(initial_point, [], initial_cmd)
         
         # Explicit constant creation not needed anymore - now happens on-demand
         # constant = self._add_constant('float', round(random.uniform(1, 5), 1))
@@ -249,7 +389,7 @@ class ClassicalGenerator:
             cmd_name, param_identifiers, return_type = cmd_sample
             
             # Handle return values
-            result_identifiers = self._handle_return_value(return_type)
+            result_identifiers = self._handle_return_value(cmd_name, param_identifiers, return_type)
             
             # Format and add the command
             command_str = self._format_command(cmd_name, param_identifiers, result_identifiers)
@@ -257,11 +397,11 @@ class ClassicalGenerator:
             commands_added += 1
         
         # Add a measure command at the end, choosing a measurable value
-        measurable_types = [gt.Measure, float, int]
         measurable_identifiers = []
         
         for identifier, value_info in self.identifiers.items():
-            for m_type in measurable_types:
+            # Check if the value's type is in MEASURABLE_TYPES
+            for m_type in MEASURABLE_TYPES:
                 if self._is_compatible_type(value_info['type'], m_type):
                     measurable_identifiers.append(identifier)
                     break
@@ -269,7 +409,11 @@ class ClassicalGenerator:
         if measurable_identifiers:
             measure_target = random.choice(measurable_identifiers)
             result_id = self._get_unused_identifier()
-            self.command_sequence.append(f"measure : {measure_target} -> {result_id}")
+            measure_cmd = f"measure : {measure_target} -> {result_id}"
+            self.command_sequence.append(measure_cmd)
+            
+            # Add measure to dependency graph
+            self.dependency_graph.add_dependency(result_id, [measure_target], measure_cmd)
             
         return self.command_sequence
 

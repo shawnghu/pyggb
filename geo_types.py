@@ -362,3 +362,12 @@ class Boolean:
     def equivalent(self, other):
         if not isinstance(other, Boolean): return False
         return self.b == other.b
+
+# Define all types that can be meaningfully measured
+MEASURABLE_TYPES = (
+    # Numeric types
+    Measure, float, int,
+    # Geometric types with direct numeric value
+    Boolean, AngleSize, Angle, Segment, Polygon
+    # Circle is no longer considered directly measurable; use specific measurement functions instead
+)

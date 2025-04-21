@@ -41,14 +41,27 @@ class Element:
         else: return []
 
     def has_value(self):
-        return isinstance(self.data, (Measure, Boolean, AngleSize, Angle, Segment, Polygon))
+        """Check if this element has a measurable value."""
+        return isinstance(self.data, MEASURABLE_TYPES)
+        
     def value(self):
-        if isinstance(self.data, (Measure, AngleSize)): return self.data.x
-        elif isinstance(self.data, Boolean): return float(self.data.b)
-        elif isinstance(self.data, Angle): return self.data.angle
-        elif isinstance(self.data, Segment): return self.data.length
-        elif isinstance(self.data, Polygon): return command_module.area_P(self.data).x
-        else: return None
+        """Extract the numeric value from this element."""
+        if isinstance(self.data, (Measure, AngleSize)): 
+            return self.data.x
+        elif isinstance(self.data, Boolean): 
+            return float(self.data.b)
+        elif isinstance(self.data, Angle): 
+            return self.data.angle
+        elif isinstance(self.data, Segment): 
+            return self.data.length
+        elif isinstance(self.data, Polygon): 
+            return commands_module.area_P(self.data).x
+        elif isinstance(self.data, Circle):
+            return self.data.r  # Measure circle radius
+        elif isinstance(self.data, (float, int)):
+            return float(self.data)
+        else: 
+            return None
 
 class Command:
     def __init__(self, command_name, input_elements, output_elements):

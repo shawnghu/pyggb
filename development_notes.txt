@@ -33,9 +33,16 @@ some points of annoyance:
 [x] handled Union types and removed them from the set of commands.
 
 
+
+- count num_ancestors in graph so that ones with high ancestors can be used
+- keep track of types of things in graph so we can know to measure a measurable thing
 - synthesis of several below points: model the commands as a directed graph; sample a long path through the graph, use this to define the final construction file.
     - note graph will not be a tree because a command may have several parents. however, it is still DAG and we start by knowing what the root is/it's generally toposorted.
 
+- handle polygon() specially
+- encourage polygon_ppi()
+-sample unused idents in a more variable way. polygons should have sequential idents but most other things should not. actually maybe even polygons should not. (don't do this one yet because it might mess up the NL translation)
+-whenever necessary, later, specify in nl translation prompts that everything is always in radians.
 
 - i think we want something slightly more sophisticated-- we want to measure something that requires a longer deduction at the end.
 - *how do we ensure that most of the commands in the construction are actually necessary?* -- I think it should be possible to automatically prune unused commands from the construction.

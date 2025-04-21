@@ -346,15 +346,6 @@ def midpoint_s(segment: gt.Segment) -> gt.Point:
     p1, p2 = segment.end_points
     return gt.Point((p1+p2)/2)
 
-def minus_a(angle: gt.Angle) -> gt.AngleSize:
-    return gt.AngleSize(-angle.angle)
-
-def minus_A(anglesize: gt.AngleSize) -> gt.AngleSize:
-    return gt.AngleSize(-anglesize.x)
-
-def minus_m(m: gt.Measure) -> gt.Measure:
-    return gt.Measure(-m.x, m.dim)
-
 def minus_mm(m1: Union[gt.Measure, float, int], m2: Union[gt.Measure, float, int]) -> gt.Measure:
     # Handle both Measure objects and numeric values
     if isinstance(m1, gt.Measure) and isinstance(m2, gt.Measure):
@@ -498,28 +489,6 @@ def ratio_mm(m1: gt.Measure, m2: gt.Measure) -> gt.Measure:
     assert(not np.isclose(m1.x, 0))
     return gt.Measure(m1.x / m2.x, m1.dim - m2.dim)
 
-def ratio_ms(m: gt.Measure, s: gt.Segment) -> gt.Measure:
-    return gt.Measure(m.x / s.length, m.dim - 1)
-
-def ratio_mi(m: gt.Measure, i: int) -> gt.Measure:
-    assert(i != 0)
-    return gt.Measure(m.x / i, m.dim)
-
-def ratio_sm(s: gt.Segment, m: gt.Measure) -> gt.Measure:
-    assert(not np.isclose(m.x, 0))
-    return gt.Measure(s.length / m.x, 1 - m.dim)
-
-def ratio_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Measure:
-    return gt.Measure(s1.length / s2.length, 0)
-
-def ratio_si(s: gt.Segment, i: int) -> gt.Measure:
-    assert(i != 0)
-    return gt.Measure(s.length / i, 1)
-
-def ratio_ii(i1: int, i2: int) -> gt.Measure:
-    assert(i2 != 0)
-    return gt.Measure(i1 / i2, 0)
-
 def ray_pp(p1: gt.Point, p2: gt.Point) -> gt.Ray:
     return gt.Ray(p1.a, p2.a-p1.a)
 
@@ -607,3 +576,24 @@ def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, dista
     closest_pt = line.c * line.n - np.dot(reference_point.a, line.n) * line.n + reference_point.a
     # Move along line direction by the specified distance
     return gt.Point(closest_pt + line.v * distance)
+
+def point_pmpm(point: gt.Point, measure: gt.Measure) -> gt.Point:
+    """Create a point at a specified distance from an existing point in a random direction."""
+    assert(measure.dim == 1 and measure.x > 0)
+    return gt.Point(point.a + measure.x * gt.random_direction())
+
+# New measurement functions
+
+def magnitude_v(vector: gt.Vector) -> gt.Measure:
+    """Measure the magnitude (length) of a vector and return as a Measure object."""
+    return gt.Measure(np.linalg.norm(vector.v), 1)  # Dimension 1 for length
+
+def arc_length_C(arc: gt.Arc) -> gt.Measure:
+    """Measure the length of an arc and return as a Measure object."""
+    angle_diff = abs(arc.angles[1] - arc.angles[0])
+    return gt.Measure(arc.r * angle_diff, 1)  # Dimension 1 for length
+
+def central_angle_C(arc: gt.Arc) -> gt.Measure:
+    """Measure the central angle of an arc in radians and return as a Measure object."""
+    angle_diff = abs(arc.angles[1] - arc.angles[0])
+    return gt.Measure(angle_diff, 0)  # Dimension 0 for angle
