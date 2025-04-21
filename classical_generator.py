@@ -79,9 +79,38 @@ class ClassicalGenerator:
     def _find_compatible_identifiers(self, required_type) -> List[str]:
         """Find identifiers that have compatible types with the required type."""
         compatible = []
+        
+        # Check if we need a numeric type
+        numeric_type = None
+        if required_type == int or required_type == float:
+            numeric_type = required_type
+        elif hasattr(required_type, "__origin__") and required_type.__origin__ is Union:
+            # Check if any of the union types are numeric
+            for t in required_type.__args__:
+                if t == int or t == float:
+                    numeric_type = t
+                    break
+                
+        # First try to find existing compatible identifiers
         for identifier, value_info in self.identifiers.items():
             if self._is_compatible_type(value_info['type'], required_type):
                 compatible.append(identifier)
+        
+        # If this is a numeric type (int or float)
+        if numeric_type is not None:
+            # Create a new constant with probability 0.8, even if compatible identifiers exist
+            if not compatible or random.random() < 0.8:
+                # Create a new constant with a random value
+                if numeric_type == int:
+                    value = random.randint(1, 10)
+                    identifier = self._add_constant('int', value)
+                else:  # float
+                    value = round(random.uniform(1, 5), 1)
+                    identifier = self._add_constant('float', value)
+                
+                # Return only the new constant, ignoring existing ones with probability 0.8
+                return [identifier]
+        
         return compatible
 
     def _sample_command(self) -> Optional[Tuple[str, List[str], Any]]:
@@ -102,23 +131,34 @@ class ClassicalGenerator:
                 return cmd_name, [], cmd_info['return_type']
                 
             # Skip commands that need parameters if we don't have any identifiers yet
-            if not self.identifiers and param_types:
+            # (except for numeric parameters which will be auto-generated)
+            if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
                 continue
                 
-            # Try to find compatible parameters
+            # Try to find compatible parameters, ensuring they are unique
             valid_params = True
             param_identifiers = []
+            used_identifiers = set()  # Track used identifiers to ensure uniqueness
             
             for param_type in param_types:
-                compatible = self._find_compatible_identifiers(param_type)
+                # Find compatible identifiers that haven't been used yet in this command
+                compatible = [
+                    ident for ident in self._find_compatible_identifiers(param_type)
+                    if ident not in used_identifiers
+                ]
+                
                 if not compatible:
                     valid_params = False
                     break
-                param_identifiers.append(random.choice(compatible))
                 
+                # Select a random compatible identifier
+                selected = random.choice(compatible)
+                param_identifiers.append(selected)
+                used_identifiers.add(selected)  # Mark as used
+            
             if valid_params:
                 return cmd_name, param_identifiers, cmd_info['return_type']
-                
+        # we are never supposed to get here-- it is always possible to construct a point
         return None
 
     def _format_command(self, cmd_name: str, params: List[str], results: List[str]) -> str:
@@ -137,11 +177,6 @@ class ClassicalGenerator:
         Handle the return value of a command.
         Returns a list of identifiers assigned to the return values.
         """
-        # Check if return type is a Union
-        if hasattr(return_type, "__origin__") and return_type.__origin__ is Union:
-            # Pick one of the possible return types
-            return_type = random.choice(return_type.__args__)
-            
         # Check if return type is a list
         if hasattr(return_type, "__origin__") and return_type.__origin__ is list:
             # For list returns, get the element type
@@ -158,9 +193,20 @@ class ClassicalGenerator:
                 
             return result_identifiers
         else:
-            # For single returns
+            # For single returns or Union returns, use the actual type
+            # The runtime will determine which specific type gets returned
+            # from a Union, so we don't need to guess
             identifier = self._get_unused_identifier()
-            self.identifiers[identifier] = {'type': return_type}
+            
+            # For Union types, we should anticipate any of the possible types
+            if hasattr(return_type, "__origin__") and return_type.__origin__ is Union:
+                # Store the full Union type - at runtime, the actual object
+                # will have one of these concrete types
+                self.identifiers[identifier] = {'type': return_type}
+            else:
+                # For concrete types
+                self.identifiers[identifier] = {'type': return_type}
+                
             return [identifier]
 
     def _add_constant(self, const_type: str, value: Any) -> str:
@@ -185,8 +231,8 @@ class ClassicalGenerator:
         self.identifiers[initial_point] = {'type': gt.Point}
         self.command_sequence.append(f"point_ : -> {initial_point}")
         
-        # Add a constant for distance or size
-        constant = self._add_constant('float', round(random.uniform(1, 5), 1))
+        # Explicit constant creation not needed anymore - now happens on-demand
+        # constant = self._add_constant('float', round(random.uniform(1, 5), 1))
         
         # Try to add commands until we reach the target
         max_attempts = 100  # Prevent infinite loops
@@ -211,7 +257,7 @@ class ClassicalGenerator:
             commands_added += 1
         
         # Add a measure command at the end, choosing a measurable value
-        measurable_types = [gt.Measure, gt.Boolean, float, int]
+        measurable_types = [gt.Measure, float, int]
         measurable_identifiers = []
         
         for identifier, value_info in self.identifiers.items():

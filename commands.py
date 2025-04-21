@@ -48,7 +48,7 @@ def are_concurrent(o1: Union[gt.Line, gt.Circle], o2: Union[gt.Line, gt.Circle],
     try:
         #if True:
         if isinstance(o1, gt.Line) and isinstance(o2, gt.Line):
-            cand = intersect_ll(o1, o2)
+            cand = [intersect_ll(o1, o2)]  # Wrap single point in list
         elif isinstance(o1, gt.Line) and isinstance(o2, gt.Circle):
             cand = intersect_lc(o1, o2)
         elif isinstance(o1, gt.Circle) and isinstance(o2, gt.Line):
@@ -56,8 +56,6 @@ def are_concurrent(o1: Union[gt.Line, gt.Circle], o2: Union[gt.Line, gt.Circle],
         elif isinstance(o1, gt.Circle) and isinstance(o2, gt.Circle):
             cand = intersect_cc(o1, o2)
     except: pass
-
-    if not isinstance(cand, (tuple,list)): cand = [cand]
 
     for p in cand:
         for obj in (o1,o2,o3):
@@ -230,11 +228,12 @@ def intersect_ll(line1: gt.Line, line2: gt.Line) -> gt.Point:
     assert(not np.isclose(np.linalg.det(matrix), 0))
     return gt.Point(np.linalg.solve(matrix, b))
 
-def intersect_lc(line: gt.Line, circle: gt.Circle) -> Union[gt.Point, List[gt.Point]]:
+def intersect_lc(line: gt.Line, circle: gt.Circle) -> List[gt.Point]:
     # shift circle to center
     y = line.c - np.dot(line.n, circle.c)
     x_squared = circle.r_squared - y**2
-    if np.isclose(x_squared, 0): return gt.Point(y*line.n + circle.c)
+    if np.isclose(x_squared, 0): 
+        return [gt.Point(y*line.n + circle.c)]  # Wrap single point in a list
     assert(x_squared > 0)
 
     x = np.sqrt(x_squared)
@@ -243,7 +242,7 @@ def intersect_lc(line: gt.Line, circle: gt.Circle) -> Union[gt.Point, List[gt.Po
         gt.Point(-x*line.v + y*line.n + circle.c),
     ]
 
-def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> Union[List[gt.Point], gt.Point]:
+def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> List[gt.Point]:
     center_diff = circle2.c - circle1.c
     center_dist_squared = np.dot(center_diff, center_diff)
     center_dist = np.sqrt(center_dist_squared)
@@ -253,7 +252,8 @@ def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> Union[List[gt.Point]
     rad_sum  = circle1.r + circle2.r
     rad_diff = circle1.r - circle2.r
     det = (rad_sum**2 - center_dist_squared) * (center_dist_squared - rad_diff**2)
-    if np.isclose(det, 0): return [gt.Point(center)]
+    if np.isclose(det, 0): 
+        return [gt.Point(center)]  # Already returning a list
     assert(det > 0)
     center_deviation = np.sqrt(det)
     center_deviation = np.array(((center_deviation,),(-center_deviation,)))
@@ -263,17 +263,15 @@ def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> Union[List[gt.Point]
         for center_dev in center_deviation * 0.5*gt.vector_perp_rot(center_diff) / center_dist_squared
     ]
 
-def intersect_cl(c: gt.Circle, l: gt.Line) -> Union[gt.Point, List[gt.Point]]:
+def intersect_cl(c: gt.Circle, l: gt.Line) -> List[gt.Point]:
     return intersect_lc(l,c)
 
 def intersect_Cl(arc: gt.Arc, line: gt.Line) -> List[gt.Point]:
-    results = intersect_lc(line,arc)
-    if not isinstance(results, (tuple, list)): results = (results,)
+    results = intersect_lc(line, arc)
     return [x for x in results if arc.contains(x.a)]
 
 def intersect_cs(circle: gt.Circle, segment: gt.Segment) -> List[gt.Point]:
     results = intersect_lc(segment, circle)
-    if not isinstance(results, (tuple, list)): results = (results,)
     return [x for x in results if segment.contains(x.a)]
 
 def intersect_lr(line: gt.Line, ray: gt.Ray) -> gt.Point:
@@ -385,17 +383,6 @@ def minus_sm(s: gt.Segment, m: gt.Measure) -> gt.Measure:
 def minus_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Measure:
     return gt.Measure(s1.length-s2.length, 1)
 
-def mirror_cc(circle: gt.Circle, by_circle: gt.Circle) -> Union[gt.Circle, gt.Line]:
-    center_v = circle.c - by_circle.c
-    denom = gt.square_norm(center_v) - circle.r_squared
-    if np.isclose(denom, 0):
-        return gt.Line(center_v, circle.r_squared/2 + np.dot(center_v, by_circle.c))
-    else:
-        return gt.Circle(
-            center = (by_circle.r_squared/denom)*center_v + by_circle.c,
-            r = by_circle.r_squared * circle.r / abs(denom)
-        )
-
 def mirror_cl(circle: gt.Circle, by_line: gt.Line) -> gt.Circle:
     return gt.Circle(
         center = circle.c + by_line.n*2*(by_line.c - np.dot(circle.c, by_line.n)),
@@ -450,7 +437,7 @@ def point_l(line: gt.Line) -> gt.Point:
 def point_s(segment: gt.Segment) -> gt.Point:
     return gt.Point(gt.interpolate(segment.end_points[0], segment.end_points[1], np.random.random()))
 
-def point_pm(point: gt.Point, distance: Union[gt.Measure, float, int]) -> gt.Point:
+def point_at_distance(point: gt.Point, distance: Union[gt.Measure, float, int]) -> gt.Point:
     """
     Create a point at a specified distance from an existing point.
     The direction is chosen randomly.
@@ -466,54 +453,6 @@ def point_pm(point: gt.Point, distance: Union[gt.Measure, float, int]) -> gt.Poi
         
     return gt.Point(point.a + dist_value * gt.random_direction())
 
-def point_pmpm(point1: gt.Point, distance1: Union[gt.Measure, float, int], 
-               point2: gt.Point, distance2: Union[gt.Measure, float, int]) -> gt.Point:
-    """
-    Create a point at specified distances from two existing points.
-    If there are two possible points, one is chosen randomly.
-    If there are no possible points (circles don't intersect), raises an assertion error.
-    """
-    # Handle both Measure objects and numeric values
-    if isinstance(distance1, gt.Measure):
-        assert(distance1.dim == 1 and distance1.x > 0)
-        dist1_value = distance1.x
-    else:
-        dist1_value = float(distance1)
-        assert(dist1_value > 0)
-        
-    if isinstance(distance2, gt.Measure):
-        assert(distance2.dim == 1 and distance2.x > 0)
-        dist2_value = distance2.x
-    else:
-        dist2_value = float(distance2)
-        assert(dist2_value > 0)
-    
-    # Create two circles centered at the points with radii equal to the distances
-    c1 = gt.Circle(point1.a, dist1_value)
-    c2 = gt.Circle(point2.a, dist2_value)
-    
-    # Find the intersection points of the two circles
-    try:
-        intersections = intersect_cc(c1, c2)
-        
-        # If there's only one intersection point, return it
-        if not isinstance(intersections, list):
-            return intersections
-            
-        # If there are two intersection points, choose one randomly
-        return intersections[np.random.randint(0, len(intersections))]
-    except:
-        # If circles don't intersect, raise an error
-        centers_dist = np.linalg.norm(point1.a - point2.a)
-        sum_radii = dist1_value + dist2_value
-        diff_radii = abs(dist1_value - dist2_value)
-        
-        if centers_dist > sum_radii:
-            raise AssertionError(f"Circles too far apart: centers distance {centers_dist} > sum of radii {sum_radii}")
-        elif centers_dist < diff_radii:
-            raise AssertionError(f"One circle inside the other: centers distance {centers_dist} < difference of radii {diff_radii}")
-        else:
-            raise AssertionError("Failed to find intersection of circles")
 
 def polar_pc(point: gt.Point, circle: gt.Circle) -> gt.Line:
     n = point.a - circle.c
@@ -547,45 +486,6 @@ def power_mi(m: gt.Measure, i: int) -> gt.Measure:
 
 def power_si(s: gt.Segment, i: int) -> gt.Measure:
     return gt.Measure(s.length ** i, i)
-
-def product_mm(m1: gt.Measure, m2: gt.Measure) -> gt.Measure:
-    return gt.Measure(m1.x * m2.x, m1.dim + m2.dim)
-
-def product_ms(m: gt.Measure, s: gt.Segment) -> gt.Measure:
-    return gt.Measure(m.x * s.length, m.dim + 1)
-
-def product_mf(m: gt.Measure, f: float) -> gt.Measure:
-    return gt.Measure(m.x * f, m.dim)
-
-def product_sm(s: gt.Segment, m: gt.Measure) -> gt.Measure:
-    return product_ms(m,s)
-
-def product_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Measure:
-    return gt.Measure(s1.length * s2.length, 2)
-
-def product_fm(f: float, m: gt.Measure) -> gt.Measure:
-    return product_mf(m, f)
-
-def product_bb(b1: gt.Boolean, b2: gt.Boolean) -> gt.Boolean:
-    """
-    Compute the logical AND of two Boolean values.
-    """
-    return gt.Boolean(b1.b and b2.b)
-
-def product_ff(f1: float, f2: float) -> gt.Measure:
-    return gt.Measure(f1*f2, 0)
-
-def product_iA(i: int, angle_size: gt.AngleSize) -> gt.AngleSize:
-    return gt.AngleSize(angle_size.x * i)
-
-def product_im(i: int, m: gt.Measure) -> gt.Measure:
-    return gt.Measure(i*m.x, m.dim)
-
-def product_is(i: int, s: gt.Segment) -> gt.Measure:
-    return gt.Measure(i*s.length, 1)
-
-def product_if(i: int, f: float) -> gt.Measure:
-    return gt.Measure(i*f, 0)
 
 def prove_b(x: gt.Boolean) -> gt.Boolean:
     print(x.b)
@@ -668,12 +568,13 @@ def sum_mi(m: gt.Measure, i: int) -> gt.Measure:
 def sum_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Measure:
     return gt.Measure(s1.length + s2.length, 1)
 
-def tangent_pc(point: gt.Point, circle: gt.Circle) -> Union[gt.Line, List[gt.Line]]:
+def tangent_pc(point: gt.Point, circle: gt.Circle) -> List[gt.Line]:
     polar = polar_pc(point, circle)
     intersections = intersect_lc(polar, circle)
-    if type(intersections) in (tuple, list) and len(intersections) == 2:
+    if len(intersections) == 2:
         return [line_pp(point, x) for x in intersections]
-    else: return polar
+    else: 
+        return [polar]  # Wrap single line in a list
 
 def touches_cc(c1: gt.Circle, c2: gt.Circle) -> gt.Boolean:
     lens = c1.r, c2.r, np.linalg.norm(c1.c-c2.c)
@@ -699,3 +600,10 @@ def measure(x: Any) -> Any:
     Simply returns the input element.
     """
     return x
+
+def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, distance: float) -> gt.Point:
+    """Create a point on a line at a specified distance from the closest point on the line to a reference point."""
+    # Project reference point onto the line
+    closest_pt = line.c * line.n - np.dot(reference_point.a, line.n) * line.n + reference_point.a
+    # Move along line direction by the specified distance
+    return gt.Point(closest_pt + line.v * distance)

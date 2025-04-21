@@ -24,18 +24,26 @@ moreover, it seems like we should be able to do some sort of tree thing where we
 maybe saving time in sampling if it takes too long to sample good constructions when the logic grows
 
 some points of annoyance:
-- need to also impose the constraint that different args are different identifiers, unless it's appropriate for them to be the same (check manually).
+[x] need to also impose the constraint that different args are different identifiers, unless it's appropriate for them to be the same (check manually).
+  [x] note i checked, i don't think it is ever very sensible to have the same identifier used for two different arguments in the same command.
+[x] need to make sure that the measure command is always the last command in the construction (yes, this is done explicitly at the end.)
+[x] idea for the numeric literals: construct them on demand in special cases, or start with very large pool of them if pruning goes quickly
+[x] shouldn't we be seeing constructions of circles with a named radius? # This command exists, so we should sometimes.
+[x] deleted the product commands for diversity, also removed a few other commands
+[x] handled Union types and removed them from the set of commands.
+
+
+- synthesis of several below points: model the commands as a directed graph; sample a long path through the graph, use this to define the final construction file.
+    - note graph will not be a tree because a command may have several parents. however, it is still DAG and we start by knowing what the root is/it's generally toposorted.
+
+
+- i think we want something slightly more sophisticated-- we want to measure something that requires a longer deduction at the end.
+- *how do we ensure that most of the commands in the construction are actually necessary?* -- I think it should be possible to automatically prune unused commands from the construction.
+  - note this may be achievable with a dependency graph; note this may not be strictly necessary because the pruning algorithm might be pretty easy.
 - not clear how to make float literals of appropriate value: mostly these are angles. so maybe just construct things of angle type directly and remove float literals.
-- shouldn't we be seeing constructions of circles with a named radius? 
-- need to make sure that the measure command is always the last command in the construction.(?)
 - starting heuristics, constructing points and defining one numeric literal are too rigid. but i think good enough for now until other more obvious issues are solved.
 - generally improve sampling heuristics, as needed, for variety.
     - in particular, probably encourage the construction of n-gons for n up to 12.
     - possibly, allow construction of a point a fixed fraction down a segment, which is common in AIME style constructions. need to define another numeric type like Proportion for this.
-- idea for the numeric literals: construct them on demand in special cases.
 
-(        # Check if return type is a Union
-        if hasattr(return_type, "__origin__") and return_type.__origin__ is Union:
-            # Pick one of the possible return types
-            return_type = random.choice(return_type.__args__))
-seems to be a huge problem, i think we want to keep it a Union, or otherwise just eliminate the existence of Union return types in this set.
+- would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
