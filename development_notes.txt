@@ -34,14 +34,23 @@ some points of annoyance:
 [x] count num_ancestors in graph so that ones with high ancestors can be used
 [x] keep track of types of things in graph so we can know to measure a measurable thing
 [x] handle polygon() specially
+[x] implement the algorithm that actually finds measurable nodes with a lot of ancestors. 
 
-
-- implement the algorithm that actually finds measurable nodes with a lot of ancestors. 
-
-- synthesis of several below points: model the commands as a directed graph; sample a long path through the graph, use this to define the final construction file.
-    - note graph will not be a tree because a command may have several parents. however, it is still DAG and we start by knowing what the root is/it's generally toposorted.
+- huge problem with the classical generator/ major simplification:
+- you don't need to think about union types or whatever, because you can just also execute the commands as needed, and then rewind whenever a command you wrote fails.
+- then lots less PL type stuff needs to be done because you can just take the type of all the returns of all the commands at runtime.
+- this currently leads to problems with commands that return a variable number of things, in particular polygon_ppi().
+- so it needs to be fixed for polygon constructions to be good.
 
 - encourage polygon_ppi() (this one is kind of tricky, maybe it shouldn't be done; maybe it should only happen towards the beginning)
+
+- implement line crossing problems.
+
+- implement rotation around a vertex of a polygon, rotation around the center of a polygon.
+
+- maybe just construct things of angle type directly and remove float literals.
+  - related: in the sample_command for this special problem construction, sample angles of interest far more often.
+
 
 -sample unused idents in a more variable way. polygons should have sequential idents but most other things should not. actually maybe even polygons should not. (don't do this one yet because it might mess up the NL translation)
 -whenever necessary, later, specify in nl translation prompts that everything is always in radians.
@@ -49,7 +58,6 @@ some points of annoyance:
 - i think we want something slightly more sophisticated-- we want to measure something that requires a longer deduction at the end.
 - *how do we ensure that most of the commands in the construction are actually necessary?* -- I think it should be possible to automatically prune unused commands from the construction.
   - note this may be achievable with a dependency graph; note this may not be strictly necessary because the pruning algorithm might be pretty easy.
-- not clear how to make float literals of appropriate value: mostly these are angles. so maybe just construct things of angle type directly and remove float literals.
 - starting heuristics, constructing points and defining one numeric literal are too rigid. but i think good enough for now until other more obvious issues are solved.
 - generally improve sampling heuristics, as needed, for variety.
     - in particular, probably encourage the construction of n-gons for n up to 12.

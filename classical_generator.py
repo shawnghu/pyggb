@@ -415,8 +415,6 @@ class ClassicalGenerator:
         self.dependency_graph.add_node(initial_point, initial_cmd, gt.Point)
         self.dependency_graph.add_dependency(initial_point, [], initial_cmd)
         
-        # Explicit constant creation not needed anymore - now happens on-demand
-        # constant = self._add_constant('float', round(random.uniform(1, 5), 1))
         
         # Try to add commands until we reach the target
         max_attempts = 100  # Prevent infinite loops
@@ -536,6 +534,18 @@ class ClassicalGenerator:
                 f.write(f"{cmd}\n")
         # print(f"Saved construction to {filename}")
 
+
+
+# this one is contrained to generate problems which at some point involve constructing a polygon, 
+# and at one point rotating it around one of its vertices or its center.
+# later in the pipeline, the generated problem when translated into NL will have a different form:
+# the "answer" to the measure will be given, and the new question will be to find the angle of rotation, which will be omitted.
+class PolygonRotationGenerator(ClassicalGenerator):
+    def __init__(self, seed=None):
+        super().__init__(seed)
+
+    def _sample_command(self):
+        pass
 
 
 def main():
