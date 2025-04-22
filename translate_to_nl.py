@@ -10,7 +10,11 @@ import hashlib
 from openai import OpenAI
 import time
 import json
+import concurrent.futures
+import threading
 global_timestamp = str(int(time.time()))
+# Add a file lock for thread-safe writing
+file_lock = threading.Lock()
 
 def create_context():
     context = "Here are some relevant files:\n\n"
@@ -138,11 +142,12 @@ def process_file_contents(filename: str, contents: str, answer: str, output_dir:
     problem = generate_problem(contents)
     if problem is None:
         return
-    with open(os.path.join(output_dir, f"{global_timestamp}.jsonl"), 'a') as f:
-        f.write(json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename}) + "\n")
+    with file_lock:  # Use a lock to ensure thread-safe file writing
+        with open(os.path.join(output_dir, f"{global_timestamp}.jsonl"), 'a') as f:
+            f.write(json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename}) + "\n")
 
 
-def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}) -> None:
+def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}, max_workers: int = 4) -> None:
     """
     Search the 'passed' directory for subdirectories that look like timestamps
     and process their contents if they come after the specified timestamp.
@@ -150,6 +155,8 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
     Args:
         after: Optional timestamp to filter directories (process only dirs with 
                timestamps greater than this value)
+        hashes: Dictionary of file hashes that have already been processed
+        max_workers: Maximum number of parallel workers to use
     """
     passed_dir = "passed"
     
@@ -164,6 +171,9 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
     
     # Sort directories by timestamp
     timestamp_dirs.sort()
+    
+    # Create a list to hold all tasks
+    all_tasks = []
     
     # Process each directory
     for timestamp, dir_path in timestamp_dirs:
@@ -183,12 +193,24 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
                 if line.startswith(filename):
                     answer = line.split(" ")[1]
                     break
-            process_file_contents(filename, contents, answer, output_dir, hash)
+            all_tasks.append((filename, contents, answer, output_dir, hash))
+    
+    # Process all tasks in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
+        for future in concurrent.futures.as_completed(futures):
+            filename = futures[future]
+            try:
+                future.result()
+                print(f"Completed processing: {filename}")
+            except Exception as exc:
+                print(f"Processing of {filename} generated an exception: {exc}")
 
 def read_hashes(output_dir: Path) -> Dict[str, bool]:
     hashes = {}
     for file in os.listdir(output_dir):
-        if file.endswith(".jsonl"):
+        # bit hacky-- heuristic to ignore files that are filtered, e.g, _validated.jsonl files
+        if file.endswith(".jsonl") and not "_" in file:
             with open(os.path.join(output_dir, file), 'r') as f:
                 for line in f:
                     data = json.loads(line)
@@ -196,7 +218,6 @@ def read_hashes(output_dir: Path) -> Dict[str, bool]:
     return hashes
 
 def main() -> None:
-
     parser = argparse.ArgumentParser(description="Process timestamp directories in the 'passed' folder.")
     parser.add_argument("--after", type=int, default=None, 
                         help="Only process directories with timestamps after this value")
@@ -204,9 +225,11 @@ def main() -> None:
                         help="Place to dump translated files.")
     parser.add_argument("--nohashcheck", action="store_false", dest="hash_check",
                         help="Disable hash checking")
+    parser.add_argument("--max_workers", type=int, default=16,
+                        help="Maximum number of parallel workers")
     args = parser.parse_args()
     hashes = read_hashes(args.output_dir)
-    process_timestamp_dirs(args.output_dir, args.after, hashes)
+    process_timestamp_dirs(args.output_dir, args.after, hashes, args.max_workers)
 
 
 if __name__ == "__main__":

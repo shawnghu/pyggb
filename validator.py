@@ -1,6 +1,8 @@
 import argparse
 import json
 import random
+import concurrent.futures
+import threading
 
 import dotenv
 import os
@@ -13,6 +15,9 @@ import openai
 openai.api_key = api_key
 
 client = openai.OpenAI()
+
+# Add a file lock for thread-safe writing
+file_lock = threading.Lock()
 
 def floatify(text):
     return text + "\nAt the end of your response, please provide your answer expressed as a decimal number rounded to 3 decimal places."
@@ -53,9 +58,31 @@ def extract_last_float(text):
 def isclose(a, b, abs_tol=0.002):
     return abs(a - b) <= abs_tol
 
+def process_question(line, model="o4-mini"):
+    """Process a single question and return the result."""
+    prompt = line["question"]
+    answer = line["answer"]
+    generated_answer = answer_question(prompt, model)
+    extracted_answer = extract_last_float(generated_answer)
+    
+    newjson = {
+        "question": prompt,
+        "generated_answer": generated_answer,
+        "original_answer": answer,
+        "extracted_answer": extracted_answer,
+        "original_filename": line.get("original_filename", ""),
+        "correct": isclose(float(extracted_answer), float(answer)) if extracted_answer is not None else False
+    }
+    
+    return newjson
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", type=str)
+    parser.add_argument("--max_workers", type=int, default=16, 
+                        help="Maximum number of parallel workers")
+    parser.add_argument("--model", type=str, default="o4-mini",
+                        help="Model to use for answering questions")
     args = parser.parse_args()
 
     data = []
@@ -63,28 +90,37 @@ def main():
         for line in f:
             data.append(json.loads(line))
 
-    # randomly sample 10 lines
-    # sampled_lines = random.sample(data, 5)
     total_correct = 0
-    with open("output.jsonl", "w") as f:
-        for line in data:
-            prompt = line["question"]
-            answer = line["answer"]
-            generated_answer = answer_question(prompt)
-            extracted_answer = extract_last_float(generated_answer)
-            newjson = {}
-            newjson["question"] = prompt
-            newjson["generated_answer"] = generated_answer
-            newjson["original_answer"] = answer
-            newjson["extracted_answer"] = extracted_answer
-            newjson["original_filename"] = line["original_filename"]
-            newjson["correct"] = isclose(float(extracted_answer), float(answer))
-            f.write(json.dumps(newjson) + "\n")
-            if newjson["correct"]:
-                total_correct += 1
-    print(f"Total correct: {total_correct}")
-
-
+    total_processed = 0
+    
+    # Process questions in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+        # Submit all tasks
+        future_to_line = {executor.submit(process_question, line, args.model): line for line in data}
+        
+        # Open output file outside the loop
+        with open("output.jsonl", "w") as f:
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(future_to_line):
+                try:
+                    result = future.result()
+                    # Use lock for thread-safe file writing
+                    with file_lock:
+                        f.write(json.dumps(result) + "\n")
+                        f.flush()  # Ensure data is written immediately
+                    
+                    if result["correct"]:
+                        total_correct += 1
+                    total_processed += 1
+                    
+                    # Print progress
+                    if total_processed % 10 == 0:
+                        print(f"Processed {total_processed}/{len(data)} questions. Current accuracy: {total_correct/total_processed:.2f}")
+                        
+                except Exception as exc:
+                    print(f"Question processing generated an exception: {exc}")
+    
+    print(f"Total correct: {total_correct}/{len(data)} ({total_correct/len(data):.2f})")
 
 if __name__ == "__main__":
     main()

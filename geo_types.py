@@ -368,6 +368,7 @@ MEASURABLE_TYPES = (
     # Numeric types
     Measure, float, int,
     # Geometric types with direct numeric value
-    Boolean, AngleSize, Angle, Segment, Polygon
-    # Circle is no longer considered directly measurable; use specific measurement functions instead
+    AngleSize, Angle, Segment, Polygon
+    # Remove Boolean because it makes boring constructions
+    # Boolean
 )

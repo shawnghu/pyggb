@@ -31,16 +31,18 @@ some points of annoyance:
 [x] shouldn't we be seeing constructions of circles with a named radius? # This command exists, so we should sometimes.
 [x] deleted the product commands for diversity, also removed a few other commands
 [x] handled Union types and removed them from the set of commands.
+[x] count num_ancestors in graph so that ones with high ancestors can be used
+[x] keep track of types of things in graph so we can know to measure a measurable thing
+[x] handle polygon() specially
 
 
+- implement the algorithm that actually finds measurable nodes with a lot of ancestors. 
 
-- count num_ancestors in graph so that ones with high ancestors can be used
-- keep track of types of things in graph so we can know to measure a measurable thing
 - synthesis of several below points: model the commands as a directed graph; sample a long path through the graph, use this to define the final construction file.
     - note graph will not be a tree because a command may have several parents. however, it is still DAG and we start by knowing what the root is/it's generally toposorted.
 
-- handle polygon() specially
-- encourage polygon_ppi()
+- encourage polygon_ppi() (this one is kind of tricky, maybe it shouldn't be done; maybe it should only happen towards the beginning)
+
 -sample unused idents in a more variable way. polygons should have sequential idents but most other things should not. actually maybe even polygons should not. (don't do this one yet because it might mess up the NL translation)
 -whenever necessary, later, specify in nl translation prompts that everything is always in radians.
 
@@ -53,4 +55,7 @@ some points of annoyance:
     - in particular, probably encourage the construction of n-gons for n up to 12.
     - possibly, allow construction of a point a fixed fraction down a segment, which is common in AIME style constructions. need to define another numeric type like Proportion for this.
 
+
 - would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
+- most ancestors calculation is currently heuristic. also, in general it is not clear that it gives you the characteristics that generate good constructions.
+- generator does a bunch of work at initialization time. if too slow, measure it to reduce overhead.

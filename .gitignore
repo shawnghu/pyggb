@@ -3,5 +3,7 @@
 __pycache__
 failed/
 .venv
+generated_constructions/
 
 *.un~
+.vscode/

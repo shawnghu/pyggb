@@ -87,7 +87,8 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
         "mode_count": mode_count,
         "all_values": measurements,
         "counts": dict(counts),
-        "pass": mode_count >= 18 and len(measurements) >= 18
+        # heuristic: a lot of degenerate constructions are creating measurements that are 0.0
+        "pass": mode_count >= 18 and len(measurements) >= 18 and abs(mode) > 0.0001
     }
     
     if verbose:
@@ -130,7 +131,8 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
             continue
             
         file_path = os.path.join(directory_path, filename)
-        print(f"Testing {filename}...")
+        if verbose: 
+            print(f"Testing {filename}...")
         
         # Test the construction
         test_results = test_measure_construction(file_path, num_tests, precision, verbose)
@@ -140,7 +142,8 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
             # print(test_results["all_values"])
 
         if test_results is None:
-            print(f"  Failed to test {filename}")
+            if verbose: 
+                print(f"  Failed to test {filename}")
             results[filename] = {"status": "error", "passed": False}
             # Move to failed directory
             shutil.move(file_path, os.path.join(failed_dir, filename))
@@ -158,7 +161,8 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
         destination = os.path.join(passed_dir if passed else failed_dir, filename)
         shutil.move(file_path, destination)
         
-        print(f"  {'PASSED' if passed else 'FAILED'}: {test_results['mode_count']} of {test_results['successful_tests']} tests gave the same result")
+        if verbose: 
+            print(f"  {'PASSED' if passed else 'FAILED'}: {test_results['mode_count']} of {test_results['successful_tests']} tests gave the same result")
     
     # Create answers.txt in the passed directory with the values from passed files
     if passed_results:
@@ -166,7 +170,8 @@ def process_directory(directory_path, passed_dir="passed", failed_dir="failed", 
         with open(answers_path, 'a') as f:
             for filename, value in passed_results.items():
                 f.write(f"{filename}: {value}\n")
-        print(f"Created answers.txt in {passed_dir} with {len(passed_results)} entries")
+        if verbose: 
+            print(f"Created answers.txt in {passed_dir} with {len(passed_results)} entries")
     
     return results
 

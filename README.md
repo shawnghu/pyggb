@@ -2,7 +2,8 @@
 
 ## Pipeline
 
-- generator.py: make candidate construction files -> generated_constructions
+- deprecated: generator.py (same as classical_generator.py, but uses gpt-4.1-mini instead of this approach)
+- classical_generator.py: make candidate construction files -> generated_constructions
 - check_construction_files.py: analysis / statistics of generated files, to try to make a better generator
 - measure_test.py: attempt to construct the files; filter for the ones that encode legitimate constructions and compute the answers -> passed/, failed/ (40% success rate)
 - translate_to_nl.py: translate the files in passed/ to natural language -> natural_language_problems/
@@ -13,9 +14,11 @@
 
 ## Summary of pipeline performance/decisions:
 - overall estimate a 1/3 success rate end to end, loosely assume that candidate construction files are 1000 tokens, input prompt is 10000 tokens for 100 constructions
-- translation to natural language problems is maybe 3000 tokens, but happens on only semantically valid constructions, so 1000 tokens per construction
+- translation to natural language problems is maybe 3000 toke
+ns, but happens on only semantically valid constructions, so 1000 tokens per construction
 - validator uses a reasoning model, so maybe 30000 tokens, or 10000 per initial construction
 - assume grader is free, which may not really be true because it can use like 6kW electricity
+
 
 -> using current scheme with 4.1-mini for generation/translation, and o4-mini for validation, 10-15 cents per valid problem
 -> of 89 generated problems, 65 were easy (qwen answered at least 4/5 correct), 7 were medium (openthinker answered at least 4/5 correct), 9 were "above-medium" (openthinker answered at least 1/5 correct), 0 were "probably-hard" (openthinker answered less than 1/5 correct)

@@ -18,6 +18,8 @@ class Node:
         self.command = command  # Command that generated this identifier
         self.value_type = value_type
         self.parents = []  # Identifiers used as arguments to create this identifier
+        # DO NOT USE THIS FOR NOW. ACTUALLY COMPUTING NUMBER OF ANCESTORS MAY NOT BE EXPENSIVE ENOUGH TO WORRY ABOUT.
+        self.ancestor_count = 0  # Number of ancestors (computed during dependency graph construction)
         
     def add_parent(self, parent_node: 'Node'):
         """Add a parent node (argument used to create this identifier)."""
@@ -26,7 +28,7 @@ class Node:
             
     def __repr__(self):
         parent_ids = [p.identifier for p in self.parents]
-        return f"Node({self.identifier}, command={self.command}, parents={parent_ids})"
+        return f"Node({self.identifier}, command={self.command}, parents={parent_ids}, ancestors={self.ancestor_count})"
 
 class DependencyGraph:
     """A directed graph tracking identifier dependencies in constructions."""
@@ -56,6 +58,31 @@ class DependencyGraph:
         for parent_id in parent_ids:
             parent_node = self.add_node(parent_id)
             child_node.add_parent(parent_node)
+            
+        # Update ancestor count for this node
+        child_node.ancestor_count = self._calculate_ancestor_count(child_node)
+    
+    def _calculate_ancestor_count(self, node: Node) -> int:
+        """
+        Calculate the number of ancestors for a node.
+        
+        The count includes:
+        - The sum of all ancestors of parent nodes
+        - Plus one for each parent node itself
+        """
+        count = 0
+        
+        # Count direct parents
+        direct_parents = len(node.parents)
+        
+        # Add the sum of all ancestors from parent nodes
+        for parent in node.parents:
+            count += parent.ancestor_count # I know this isn't actually correct; heuristic.
+        
+        # Add the direct parents count
+        count += direct_parents
+        
+        return count
     
     def get_ancestors(self, identifier: str) -> Set[str]:
         """Get all ancestors (direct and indirect parents) of a node."""
@@ -78,7 +105,13 @@ class DependencyGraph:
                     to_process.append(parent)
                     
         return ancestors
-        
+    
+    def get_type(self, identifier: str) -> Any:
+        """Get the type associated with an identifier."""
+        if identifier in self.nodes:
+            return self.nodes[identifier].value_type
+        return None
+    
     def __repr__(self):
         return f"DependencyGraph with {len(self.nodes)} nodes"
 
@@ -310,6 +343,9 @@ class ClassicalGenerator:
             # Now add dependencies to the graph with the full command
             if self.dependency_graph:
                 for result_id in result_identifiers:
+                    # Pass the type when creating the node dependency
+                    value_type = self.identifiers[result_id]['type']
+                    self.dependency_graph.add_node(result_id, full_cmd, value_type)
                     self.dependency_graph.add_dependency(result_id, param_identifiers, full_cmd)
             
             return result_identifiers
@@ -328,11 +364,16 @@ class ClassicalGenerator:
                 # For concrete types
                 self.identifiers[identifier] = {'type': return_type}
             
+            # Get the type for the node
+            value_type = self.identifiers[identifier]['type']
+            
             # Create the full command string for the dependency graph
             full_cmd = self._format_command(cmd_name, param_identifiers, [identifier])
             
             # Add to dependency graph
             if self.dependency_graph:
+                # Pass the type when creating the node
+                self.dependency_graph.add_node(identifier, full_cmd, value_type)
                 self.dependency_graph.add_dependency(identifier, param_identifiers, full_cmd)
                 
             return [identifier]
@@ -352,6 +393,8 @@ class ClassicalGenerator:
         
         # Add to dependency graph
         if self.dependency_graph:
+            value_type = self.identifiers[identifier]['type']
+            self.dependency_graph.add_node(identifier, command, value_type)
             self.dependency_graph.add_dependency(identifier, [], command)
             
         return identifier
@@ -368,7 +411,8 @@ class ClassicalGenerator:
         initial_cmd = f"point_ : -> {initial_point}"
         self.command_sequence.append(initial_cmd)
         
-        # Add initial point to dependency graph
+        # Add initial point to dependency graph with its type
+        self.dependency_graph.add_node(initial_point, initial_cmd, gt.Point)
         self.dependency_graph.add_dependency(initial_point, [], initial_cmd)
         
         # Explicit constant creation not needed anymore - now happens on-demand
@@ -412,32 +456,106 @@ class ClassicalGenerator:
             measure_cmd = f"measure : {measure_target} -> {result_id}"
             self.command_sequence.append(measure_cmd)
             
-            # Add measure to dependency graph
+            # Add measure to dependency graph with its type (which is the same as the target's type)
+            target_type = self.identifiers[measure_target]['type']
+            self.dependency_graph.add_node(result_id, measure_cmd, target_type)
             self.dependency_graph.add_dependency(result_id, [measure_target], measure_cmd)
             
         return self.command_sequence
 
+    def compute_longest_construction(self):
+        """
+        Find the measurable quantity with the most ancestors and create a pruned
+        construction sequence that includes only the commands needed to construct it.
+        
+        This method:
+        1. Identifies all measurable quantities in the graph
+        2. Finds the one with the most ancestors
+        3. Uses DFS on the reversed dependency graph to build the minimal set of commands needed
+        4. Sets self.pruned_command_sequence to the result
+        """
+        if not self.dependency_graph:
+            self.pruned_command_sequence = self.command_sequence.copy()
+            return
+            
+        # Find all measurable quantities
+        measurable_nodes = []
+        for identifier, node in self.dependency_graph.nodes.items():
+            node_type = node.value_type
+            # Check if the node's type is in MEASURABLE_TYPES
+            for m_type in MEASURABLE_TYPES:
+                if self._is_compatible_type(node_type, m_type):
+                    measurable_nodes.append(node)
+                    break
+        
+        if not measurable_nodes:
+            # If no measurable quantities found, keep the original sequence
+            self.pruned_command_sequence = self.command_sequence.copy()
+            return
+            
+        # Find the measurable quantity with the most ancestors
+        target_node = max(measurable_nodes, key=lambda node: node.ancestor_count)
+        
+        # Collect all commands needed for this node using DFS   
+        required_commands = set()  # Use a set to avoid duplicates
+        visited = set()
+        
+        def dfs(node):
+            if node.identifier in visited:
+                return
+                
+            visited.add(node.identifier)
+            
+            # First visit all parents (reversed DFS)
+            for parent in node.parents:
+                dfs(parent)
+                
+            # Then add this node's command if it exists
+            if node.command:
+                required_commands.add(node.command)
+        
+        # Start DFS from the target node
+        dfs(target_node)
+        
+        # Convert to list and sort by original command order
+        command_order = {cmd: i for i, cmd in enumerate(self.command_sequence)}
+        ordered_commands = sorted(required_commands, key=lambda cmd: command_order.get(cmd, float('inf')))
+        
+        # Add a measure command for the target node
+        measure_cmd = f"measure : {target_node.identifier} -> M"
+        ordered_commands.append(measure_cmd)
+        
+        # Set the pruned command sequence
+        self.pruned_command_sequence = ordered_commands
+
     def save_construction(self, filename: str, description: str = "Generated construction"):
-        """Save the generated construction to a file."""
+
         with open(filename, 'w') as f:
             f.write(f"# {description}\n")
-            for cmd in self.command_sequence:
+            for cmd in self.pruned_command_sequence:
                 f.write(f"{cmd}\n")
-        print(f"Saved construction to {filename}")
+        # print(f"Saved construction to {filename}")
+
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate classical geometric constructions")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
-    parser.add_argument("--num_commands", type=int, default=5, help="Number of commands to generate")
+    parser.add_argument("--num_commands", type=int, default=100, help="Number of commands to generate")
     parser.add_argument("--output_dir", type=str, default="generated_constructions/", help="Output directory")
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to generate")
     args = parser.parse_args()
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output_dir, exist_ok=True)
     
     for i in range(args.count):
         seed = args.seed + i if args.seed is not None else None
         generator = ClassicalGenerator(seed=seed)
         generator.generate_construction(num_commands=args.num_commands)
+        
+        # Prune the construction to include only essential commands
+        generator.compute_longest_construction()
         
         # Create unique filename if generating multiple constructions
         filename = os.path.join(args.output_dir, f"construction_{i+1}.txt")
