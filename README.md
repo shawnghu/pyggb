@@ -16,7 +16,7 @@
 - overall estimate a 1/3 success rate end to end, loosely assume that candidate construction files are 1000 tokens, input prompt is 10000 tokens for 100 constructions
 - translation to natural language problems is maybe 3000 toke
 ns, but happens on only semantically valid constructions, so 1000 tokens per construction
-- validator uses a reasoning model, so maybe 30000 tokens, or 10000 per initial construction
+- validator uses a reasoning model, so maybe 30000 tokens, or 10000 per initial construction, but is on o4-mini, which is 
 - assume grader is free, which may not really be true because it can use like 6kW electricity
 
 
@@ -49,3 +49,6 @@ There seems to be no major advantage to asking the model to generate such files 
 ## Alternate generator approach:
 - classical_generator.py: generate random construction files from scratch, use programming-language constructs to constrain the symbols which can be sampled so that all programs are syntactically valid. (initial attempt complete, makes a few semantically valid constructions, but not very good. in development.) 
 - see also development_notes.txt
+
+
+

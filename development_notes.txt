@@ -59,3 +59,19 @@ some points of annoyance:
 - would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
 - most ancestors calculation is currently heuristic. also, in general it is not clear that it gives you the characteristics that generate good constructions.
 - generator does a bunch of work at initialization time. if too slow, measure it to reduce overhead.
+
+
+--REMEMBER to evaluate openthinker against qwen. it doesn't seem much better than qwen. 
+CUDA_VISIBLE_DEVICES=0,1 python grader.py --tensor_parallel_size 2 --model_shortname=openthinker --num_trials 5 natural_language_problems/1745289039_validated.jsonl --grade_all_problems
+
+## compositional problems
+- need to make sure that the model can't solve the test questions.
+
+-geo-arith problem: construct a regular polygon. set an arithmetic condition on when to draw lines between points
+-subproblems: determine when the arithmetic condition holds. determine what the result of drawing the lines is:
+
+-geo-combinatorics problem: aime dodecagon problem
+-subproblems: be generally good at combinatorics / counting intersections and shit. be better at geometry in the sense that we know how to handle rotations and shit.
+
+- general critique: by tuning the difficulty of the problem we can appear to achieve a result, assuming the fine tuning helps at all and the difficulty is approximately projected onto one dimension.
+- if composition is an entirely separate matter from capability at the subproblems then fine.
