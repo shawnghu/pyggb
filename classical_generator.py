@@ -494,7 +494,7 @@ class ClassicalGenerator:
 def main():
     parser = argparse.ArgumentParser(description="Generate classical geometric constructions")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
-    parser.add_argument("--num_commands", type=int, default=100, help="Number of commands to generate")
+    parser.add_argument("--num_commands", type=int, default=25, help="Number of commands to generate")
     parser.add_argument("--output_dir", type=str, default="generated_constructions/", help="Output directory")
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to generate")
     args = parser.parse_args()

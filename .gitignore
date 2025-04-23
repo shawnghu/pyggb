@@ -4,6 +4,7 @@ __pycache__
 failed/
 .venv
 generated_constructions/
+passed/
 
 *.un~
 *.swp
