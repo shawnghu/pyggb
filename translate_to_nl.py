@@ -228,7 +228,7 @@ def main() -> None:
     parser.add_argument("--max_workers", type=int, default=16,
                         help="Maximum number of parallel workers")
     args = parser.parse_args()
-    hashes = read_hashes(args.output_dir)
+    hashes = read_hashes(args.output_dir) if args.hash_check else {}
     process_timestamp_dirs(args.output_dir, args.after, hashes, args.max_workers)
 
 
