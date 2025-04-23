@@ -64,10 +64,12 @@ class Element:
             return None
 
 class Command:
-    def __init__(self, command_name, input_elements, output_elements):
+    def __init__(self, command_name, input_elements, output_elements=None, label_factory=None, label_dict=None):
         self.name = command_name
         self.input_elements = input_elements
         self.output_elements = output_elements
+        self.label_factory = label_factory
+        self.label_dict = label_dict
 
     def apply(self):
         input_data = [x.data for x in self.input_elements]
@@ -75,10 +77,18 @@ class Command:
         if name not in command_dict: name = self.name
         f = command_dict[name]
         output_data = f(*input_data)
-        if not isinstance(output_data, (tuple, list)): output_data = (output_data,)
-        assert(len(output_data) == len(self.output_elements))
-        for x,o in zip(output_data, self.output_elements):
-            if o is not None: o.data = x
+        if not isinstance(output_data, (tuple, list)):
+            output_data = (output_data,)
+        if self.output_elements:
+            assert(len(output_data) == len(self.output_elements))
+            for x,o in zip(output_data, self.output_elements):
+                if o is not None:
+                    o.data = x
+        else:
+            if self.label_factory:
+                self.output_elements = [Element(self.label_factory(), self.label_dict) for _ in range(len(output_data))]
+                for x,o in zip(output_data, self.output_elements):
+                    o.data = x
 
     def __repr__(self):
         inputs_str = ' '.join([x.label for x in self.input_elements])
@@ -106,7 +116,7 @@ class ConstCommand:
 
     def __str__(self):
         datatype_str = const_type_to_str[self.datatype]
-        return "const {} {} -> {}".format(datatype_str, self.value, self.label)
+        return "const {} {} -> {}".format(datatype_str, self.value, self.element.label)
 
 def parse_command(line, element_dict):
     # Skip empty lines and comment lines

@@ -479,7 +479,6 @@ def power_si(s: gt.Segment, i: int) -> gt.Measure:
     return gt.Measure(s.length ** i, i)
 
 def prove_b(x: gt.Boolean) -> gt.Boolean:
-    print(x.b)
     return x
 
 def radius_c(circle: gt.Circle) -> gt.Measure:

@@ -1,62 +1,65 @@
 import numpy as np
+np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import random
 import inspect
 import sys
 import os
 import argparse
-from typing import Dict, List, Set, Tuple, Any, Union, Optional
+from typing import Dict, List, Set, Tuple, Any, Union, Optional, Generator
+import pdb
 
 # Import the commands module
 import commands
 import geo_types as gt
 from geo_types import MEASURABLE_TYPES
 
+# Import required functions from random_constr.py directly
+from random_constr import Command, Element, ConstCommand
+
 class Node:
-    """A node in the dependency graph representing an identifier."""
-    def __init__(self, identifier: str, command: str = None, value_type: Any = None):
-        self.identifier = identifier
-        self.command = command  # Command that generated this identifier
-        self.value_type = value_type
-        self.parents = []  # Identifiers used as arguments to create this identifier
-        # DO NOT USE THIS FOR NOW. ACTUALLY COMPUTING NUMBER OF ANCESTORS MAY NOT BE EXPENSIVE ENOUGH TO WORRY ABOUT.
+    """A node in the dependency graph representing an Element."""
+    def __init__(self, element: Element, command: Optional[Command] = None):
+        self.element = element
+        self.command = command  # Command that generated this element
+        self.parents = []  # Elements used as arguments to create this element
         self.ancestor_count = 0  # Number of ancestors (computed during dependency graph construction)
         
     def add_parent(self, parent_node: 'Node'):
-        """Add a parent node (argument used to create this identifier)."""
+        """Add a parent node (argument used to create this element)."""
         if parent_node not in self.parents:
             self.parents.append(parent_node)
             
     def __repr__(self):
-        parent_ids = [p.identifier for p in self.parents]
-        return f"Node({self.identifier}, command={self.command}, parents={parent_ids}, ancestors={self.ancestor_count})"
+        parent_labels = [p.element.label for p in self.parents]
+        return f"Node({self.element.label}, parents={parent_labels}, ancestors={self.ancestor_count})"
 
 class DependencyGraph:
-    """A directed graph tracking identifier dependencies in constructions."""
+    """A directed graph tracking Element dependencies in constructions."""
     def __init__(self):
-        self.nodes = {}  # Maps identifier to Node object
+        self.nodes = {}  # Maps element label to Node object
         
-    def add_node(self, identifier: str, command: str = None, value_type: Any = None) -> Node:
+    def add_node(self, element: Element, command: Optional[Command] = None) -> Node:
         """Add a node to the graph."""
-        if identifier not in self.nodes:
-            self.nodes[identifier] = Node(identifier, command, value_type)
-        return self.nodes[identifier]
+        if element.label not in self.nodes:
+            self.nodes[element.label] = Node(element, command)
+        return self.nodes[element.label]
         
-    def add_dependency(self, child_id: str, parent_ids: List[str], command: str):
+    def add_dependency(self, child_element: Element, parent_elements: List[Element], command: Command):
         """
         Add a dependency relationship: child depends on parents through command.
         If nodes don't exist, they will be created.
         
         Args:
-            child_id: Identifier for the child node
-            parent_ids: List of parent identifiers
-            command: The full command string (e.g., "circle_pp : A B -> C")
+            child_element: Element for the child node
+            parent_elements: List of parent elements
+            command: The Command object that created the child element
         """
         # Ensure all nodes exist
-        child_node = self.add_node(child_id, command)
+        child_node = self.add_node(child_element, command)
         
         # Add parents
-        for parent_id in parent_ids:
-            parent_node = self.add_node(parent_id)
+        for parent_element in parent_elements:
+            parent_node = self.add_node(parent_element)
             child_node.add_parent(parent_node)
             
         # Update ancestor count for this node
@@ -84,13 +87,13 @@ class DependencyGraph:
         
         return count
     
-    def get_ancestors(self, identifier: str) -> Set[str]:
+    def get_ancestors(self, element_label: str) -> Set[Element]:
         """Get all ancestors (direct and indirect parents) of a node."""
-        if identifier not in self.nodes:
+        if element_label not in self.nodes:
             return set()
             
         ancestors = set()
-        to_process = [self.nodes[identifier]]
+        to_process = [self.nodes[element_label]]
         processed = set()
         
         while to_process:
@@ -100,17 +103,11 @@ class DependencyGraph:
                 
             processed.add(current)
             for parent in current.parents:
-                ancestors.add(parent.identifier)
+                ancestors.add(parent.element)
                 if parent not in processed:
                     to_process.append(parent)
                     
         return ancestors
-    
-    def get_type(self, identifier: str) -> Any:
-        """Get the type associated with an identifier."""
-        if identifier in self.nodes:
-            return self.nodes[identifier].value_type
-        return None
     
     def __repr__(self):
         return f"DependencyGraph with {len(self.nodes)} nodes"
@@ -127,16 +124,19 @@ class ClassicalGenerator:
         self.identifier_pool += [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
         
         # Keep track of used identifiers and their types
-        self.identifiers: Dict[str, Any] = {}
+        self.identifiers: Dict[str, Element] = {}
         
         # Get all available commands from the commands module
         self.available_commands = self._get_commands()
         
         # Command sequence
-        self.command_sequence = []
+        self.command_sequence = []  # Now stores Command objects
         
         # Dependency graph
         self.dependency_graph = None
+        
+        # Pruned command sequence
+        self.pruned_command_sequence = None
 
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
@@ -176,16 +176,10 @@ class ClassicalGenerator:
         raise ValueError("Ran out of identifiers!")
 
     def _is_compatible_type(self, value_type, required_type) -> bool:
-        """Check if a value type is compatible with a required type."""
-        # Handle Union types
-        if hasattr(required_type, "__origin__") and required_type.__origin__ is Union:
-            return any(self._is_compatible_type(value_type, t) for t in required_type.__args__)
-        
-        # Check if the types match or if required_type is Any
         return value_type == required_type or required_type == Any
 
-    def _find_compatible_identifiers(self, required_type) -> List[str]:
-        """Find identifiers that have compatible types with the required type."""
+    def _find_compatible_elements(self, required_type) -> List[Element]:
+        """Find elements that have compatible types with the required type."""
         compatible = []
         
         # Check if we need a numeric type
@@ -199,38 +193,59 @@ class ClassicalGenerator:
                     numeric_type = t
                     break
                 
-        # First try to find existing compatible identifiers
-        for identifier, value_info in self.identifiers.items():
-            if self._is_compatible_type(value_info['type'], required_type):
-                compatible.append(identifier)
+        # First try to find existing compatible elements
+        for identifier, element in self.identifiers.items():
+            actual_type = type(element.data)
+            if self._is_compatible_type(actual_type, required_type):
+                compatible.append(element)
         
         # If this is a numeric type (int or float)
         if numeric_type is not None:
-            # Create a new constant with probability 0.8, even if compatible identifiers exist
+            # Create a new constant with probability 0.8, even if compatible elements exist
             if not compatible or random.random() < 0.8:
                 # Create a new constant with a random value
                 if numeric_type == int:
                     value = random.randint(1, 10)
-                    identifier = self._add_constant('int', value)
+                    element, const_command = self._add_constant('int', value)
+                    # Return the newly created element
+                    return [element]
                 else:  # float
                     value = round(random.uniform(1, 5), 1)
-                    identifier = self._add_constant('float', value)
-                
-                # Return only the new constant, ignoring existing ones with probability 0.8
-                return [identifier]
+                    element, const_command = self._add_constant('float', value)
+                    # Return the newly created element
+                    return [element]
         
         return compatible
+    
+    def _try_apply_command(self, cmd_name: str, input_elements: List[Element]) -> Tuple[bool, List[Element], Command]:
+        """
+        Try to execute a command and return its result.
+        
+        Args:
+            cmd_name: Name of the command to execute
+            input_elements: List of Element objects containing the input data
+            
+        Returns:
+            Tuple of (success, output_elements, command):
+            - success: Boolean indicating if the command executed successfully
+            - output_elements: List of output Element objects if successful, empty list otherwise
+            - command: The Command object that was executed
+        """
+        try:
+            command = Command(cmd_name, input_elements, label_factory=self._get_unused_identifier, label_dict=self.identifiers)
+            command.apply()
+            return True, command
+        except Exception as e:
+            return False, None
 
-    def _sample_command(self) -> Optional[Tuple[str, List[str], Any]]:
-        """
-        Sample a random command that can be executed with existing identifiers.
-        Returns a tuple of (command_name, parameter_identifiers, return_type) or None if no valid command can be sampled.
-        """
+    def _sample_commands(self) -> Generator[str, None, None]:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
         random.shuffle(command_names)
         
         for cmd_name in command_names:
+            if 'prove' in cmd_name or 'measure' in cmd_name:
+                continue # these are special commands, not part of constructions
             # heuristics for not making boring things
             if 'minus' in cmd_name:
                 if cmd_name != 'minus_mm':
@@ -245,176 +260,140 @@ class ClassicalGenerator:
             if 'ratio' in cmd_name:
                 if random.random() < 0.8:
                     continue
-            
+            yield cmd_name
+
+    def _execute_new_command(self) -> Tuple[List[Element], Command]:
+        """
+        Sample a random command that can be executed with existing elements.
+        Returns a tuple of (input_elements, command) or None if no valid command can be sampled.
+        """
+
+        for cmd_name in self._sample_commands():
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
             
             # Special case for commands that create points without parameters
             if cmd_name == 'point_' and len(param_types) == 0:
-                return cmd_name, [], cmd_info['return_type']
+                # Try to execute the command directly
+                success, command = self._try_apply_command(cmd_name, [])
+                if success:
+                    return [], command
+                else:
+                    continue
                 
             # Special case for polygon command - needs at least 3 points
             if cmd_name == 'polygon':
-                # Check if we have at least 3 point identifiers
-                point_identifiers = [
-                    ident for ident, info in self.identifiers.items() 
-                    if self._is_compatible_type(info['type'], gt.Point)
-                ]
+                # Check if we have at least 3 point elements
+                point_elements = []
+                for element in self.identifiers.values():
+                    if isinstance(element.data, gt.Point):
+                        point_elements.append(element)
                 
-                if len(point_identifiers) < 3:
+                if len(point_elements) < 3:
                     continue  # Skip polygon command if we don't have enough points
                 
-                # Choose at least 3 and up to 12 unique point identifiers
-                num_points = min(random.randint(3, 12), len(point_identifiers))
-                selected_points = []
+                # Choose at least 3 and up to 12 unique point elements
+                num_points = min(random.randint(3, 12), len(point_elements))
                 
                 # Shuffle and pick points
-                random.shuffle(point_identifiers)
-                selected_points = point_identifiers[:num_points]
+                random.shuffle(point_elements)
+                selected_points = point_elements[:num_points]
                 
-                return cmd_name, selected_points, cmd_info['return_type']
+                # Try to execute the command
+                success, command = self._try_apply_command(cmd_name, selected_points)
+                if success:
+                    return selected_points, command
+                else:
+                    continue
                 
-            # Skip commands that need parameters if we don't have any identifiers yet
-            # (except for numeric parameters which will be auto-generated)
+            # Skip commands that need parameters if we don't have any elements yet
             if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
                 continue
                 
             # Try to find compatible parameters, ensuring they are unique
             valid_params = True
-            param_identifiers = []
-            used_identifiers = set()  # Track used identifiers to ensure uniqueness
+            input_elements = []
+            used_elements = set()  # Track used elements to ensure uniqueness
             
             for param_type in param_types:
-                # Find compatible identifiers that haven't been used yet in this command
-                compatible = [
-                    ident for ident in self._find_compatible_identifiers(param_type)
-                    if ident not in used_identifiers
-                ]
+                compatible = self._find_compatible_elements(param_type)
                 
                 if not compatible:
                     valid_params = False
                     break
                 
-                # Select a random compatible identifier
-                selected = random.choice(compatible)
-                param_identifiers.append(selected)
-                used_identifiers.add(selected)  # Mark as used
+                # Filter out already used elements
+                available_elements = [elem for elem in compatible if elem not in used_elements]
+                if not available_elements:
+                    valid_params = False
+                    break
+                
+                # Select a random compatible element
+                selected = random.choice(available_elements)
+                input_elements.append(selected)
+                used_elements.add(selected)  # Mark as used
             
             if valid_params:
-                return cmd_name, param_identifiers, cmd_info['return_type']
-        # we are never supposed to get here-- it is always possible to construct a point
-        return None
+                # Try to execute the command
+                success, command = self._try_apply_command(cmd_name, input_elements)
+                if success:
+                    return input_elements, command
+                else:
+                    continue
+        # we should never get here
 
-    def _format_command(self, cmd_name: str, params: List[str], results: List[str]) -> str:
-        """Format a command as a string in the expected format."""
-        param_str = " ".join(params)
-        result_str = " ".join(results)
-        
-        # Special case for point_ which has no parameters
-        if cmd_name == 'point_':
-            return f"{cmd_name} : -> {result_str}"
-        
-        return f"{cmd_name} : {param_str} -> {result_str}"
+    def _update_dependency_graph(self, command: Command, input_elements: List[Element], output_elements: List[Element]) -> None:
+        if not self.dependency_graph:
+            return
+            
+        # Add dependencies to the graph
+        for result_elem in output_elements:
+            # Add node and dependencies
+            self.dependency_graph.add_node(result_elem, command)
+            self.dependency_graph.add_dependency(result_elem, input_elements, command)
 
-    def _handle_return_value(self, cmd_name: str, param_identifiers: List[str], return_type) -> List[str]:
-        """
-        Handle the return value of a command.
-        Returns a list of identifiers assigned to the return values.
-        """
-        # Check if return type is a list
-        if hasattr(return_type, "__origin__") and return_type.__origin__ is list:
-            # For list returns, get the element type
-            element_type = return_type.__args__[0]
-            
-            # Randomly choose how many elements to handle (1-3)
-            num_elements = random.randint(1, 3)
-            result_identifiers = []
-            
-            for _ in range(num_elements):
-                identifier = self._get_unused_identifier()
-                self.identifiers[identifier] = {'type': element_type}
-                
-                # Add to dependency graph - this will be done after the full command is created
-                result_identifiers.append(identifier)
-            
-            # Create the full command string to use in the dependency graph
-            full_cmd = self._format_command(cmd_name, param_identifiers, result_identifiers)
-            
-            # Now add dependencies to the graph with the full command
-            if self.dependency_graph:
-                for result_id in result_identifiers:
-                    # Pass the type when creating the node dependency
-                    value_type = self.identifiers[result_id]['type']
-                    self.dependency_graph.add_node(result_id, full_cmd, value_type)
-                    self.dependency_graph.add_dependency(result_id, param_identifiers, full_cmd)
-            
-            return result_identifiers
-        else:
-            # For single returns or Union returns, use the actual type
-            # The runtime will determine which specific type gets returned
-            # from a Union, so we don't need to guess
-            identifier = self._get_unused_identifier()
-            
-            # For Union types, we should anticipate any of the possible types
-            if hasattr(return_type, "__origin__") and return_type.__origin__ is Union:
-                # Store the full Union type - at runtime, the actual object
-                # will have one of these concrete types
-                self.identifiers[identifier] = {'type': return_type}
-            else:
-                # For concrete types
-                self.identifiers[identifier] = {'type': return_type}
-            
-            # Get the type for the node
-            value_type = self.identifiers[identifier]['type']
-            
-            # Create the full command string for the dependency graph
-            full_cmd = self._format_command(cmd_name, param_identifiers, [identifier])
-            
-            # Add to dependency graph
-            if self.dependency_graph:
-                # Pass the type when creating the node
-                self.dependency_graph.add_node(identifier, full_cmd, value_type)
-                self.dependency_graph.add_dependency(identifier, param_identifiers, full_cmd)
-                
-            return [identifier]
-
-    def _add_constant(self, const_type: str, value: Any) -> str:
-        """Add a constant value to the available identifiers."""
+    def _add_constant(self, const_type: str, value: Any) -> Tuple[Element, ConstCommand]:
         identifier = self._get_unused_identifier()
         
+        # Create the element
+        element = Element(identifier, self.identifiers)
+        
         if const_type == 'int':
-            self.identifiers[identifier] = {'type': int}
-            command = f"const int {value} -> {identifier}"
-            self.command_sequence.append(command)
+            data = int(value)
         elif const_type == 'float':
-            self.identifiers[identifier] = {'type': float}
-            command = f"const float {value} -> {identifier}"
-            self.command_sequence.append(command)
+            data = float(value)
+        
+        # Create the ConstCommand
+        const_command = ConstCommand(type(data), value, element)
+        
+        # Apply the command to set the data
+        const_command.apply()
+        
+        # Add to command sequence
+        self.command_sequence.append(const_command)
         
         # Add to dependency graph
         if self.dependency_graph:
-            value_type = self.identifiers[identifier]['type']
-            self.dependency_graph.add_node(identifier, command, value_type)
-            self.dependency_graph.add_dependency(identifier, [], command)
+            self.dependency_graph.add_node(element, const_command)
+            self.dependency_graph.add_dependency(element, [], const_command)
             
-        return identifier
+        return element, const_command
 
-    def generate_construction(self, num_commands: int = 5) -> List[str]:
+    def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
         # Initialize the dependency graph
         self.dependency_graph = DependencyGraph()
         commands_added = 0
         
-        # We need to start with a point or two
-        initial_point = self._get_unused_identifier()
-        self.identifiers[initial_point] = {'type': gt.Point}
-        initial_cmd = f"point_ : -> {initial_point}"
-        self.command_sequence.append(initial_cmd)
+        # We need to start with a point
+        success, command = self._try_apply_command('point_', [])
+        self.command_sequence.append(command)
         
-        # Add initial point to dependency graph with its type
-        self.dependency_graph.add_node(initial_point, initial_cmd, gt.Point)
-        self.dependency_graph.add_dependency(initial_point, [], initial_cmd)
+        # Add to dependency graph
+        input_elements = []
+        self._update_dependency_graph(command, input_elements, command.output_elements)
         
+        commands_added += 1
         
         # Try to add commands until we reach the target
         max_attempts = 100  # Prevent infinite loops
@@ -424,53 +403,50 @@ class ClassicalGenerator:
             attempt += 1
             
             # Sample a command that can be executed
-            cmd_sample = self._sample_command()
+            cmd_sample = self._execute_new_command()
             if cmd_sample is None:
                 continue
                 
-            cmd_name, param_identifiers, return_type = cmd_sample
+            input_elements, command = cmd_sample
             
-            # Handle return values
-            result_identifiers = self._handle_return_value(cmd_name, param_identifiers, return_type)
+            # Add the command to our sequence
+            self.command_sequence.append(command)
             
-            # Format and add the command
-            command_str = self._format_command(cmd_name, param_identifiers, result_identifiers)
-            self.command_sequence.append(command_str)
+            # Update dependency graph
+            self._update_dependency_graph(command, input_elements, command.output_elements)
+            
             commands_added += 1
         
         # Add a measure command at the end, choosing a measurable value
-        measurable_identifiers = []
+        measurable_elements = []
         
-        for identifier, value_info in self.identifiers.items():
-            # Check if the value's type is in MEASURABLE_TYPES
-            for m_type in MEASURABLE_TYPES:
-                if self._is_compatible_type(value_info['type'], m_type):
-                    measurable_identifiers.append(identifier)
-                    break
+        for element in self.identifiers.values():
+            # Check if the element's data type is in MEASURABLE_TYPES
+            if any(isinstance(element.data, m_type) for m_type in MEASURABLE_TYPES):
+                measurable_elements.append(element)
         
-        if measurable_identifiers:
-            measure_target = random.choice(measurable_identifiers)
-            result_id = self._get_unused_identifier()
-            measure_cmd = f"measure : {measure_target} -> {result_id}"
-            self.command_sequence.append(measure_cmd)
+        if measurable_elements:
+            measure_target = random.choice(measurable_elements)
             
-            # Add measure to dependency graph with its type (which is the same as the target's type)
-            target_type = self.identifiers[measure_target]['type']
-            self.dependency_graph.add_node(result_id, measure_cmd, target_type)
-            self.dependency_graph.add_dependency(result_id, [measure_target], measure_cmd)
+            # Try to execute the measure command
+            success, command = self._try_apply_command('measure', [measure_target])
             
+            if success:
+                # Add the measure command
+                self.command_sequence.append(command)
+                
+                # Update dependency graph
+                self._update_dependency_graph(command, [measure_target], command.output_elements)
+        
+        # Set pruned_command_sequence to the full sequence for now
+        self.pruned_command_sequence = self.command_sequence.copy()
+        
         return self.command_sequence
 
     def compute_longest_construction(self):
         """
         Find the measurable quantity with the most ancestors and create a pruned
         construction sequence that includes only the commands needed to construct it.
-        
-        This method:
-        1. Identifies all measurable quantities in the graph
-        2. Finds the one with the most ancestors
-        3. Uses DFS on the reversed dependency graph to build the minimal set of commands needed
-        4. Sets self.pruned_command_sequence to the result
         """
         if not self.dependency_graph:
             self.pruned_command_sequence = self.command_sequence.copy()
@@ -478,13 +454,11 @@ class ClassicalGenerator:
             
         # Find all measurable quantities
         measurable_nodes = []
-        for identifier, node in self.dependency_graph.nodes.items():
-            node_type = node.value_type
-            # Check if the node's type is in MEASURABLE_TYPES
-            for m_type in MEASURABLE_TYPES:
-                if self._is_compatible_type(node_type, m_type):
-                    measurable_nodes.append(node)
-                    break
+        for label, node in self.dependency_graph.nodes.items():
+            element = node.element
+            # Check if the element's data is a measurable type
+            if any(isinstance(element.data, m_type) for m_type in MEASURABLE_TYPES):
+                measurable_nodes.append(node)
         
         if not measurable_nodes:
             # If no measurable quantities found, keep the original sequence
@@ -499,10 +473,10 @@ class ClassicalGenerator:
         visited = set()
         
         def dfs(node):
-            if node.identifier in visited:
+            if node.element.label in visited:
                 return
                 
-            visited.add(node.identifier)
+            visited.add(node.element.label)
             
             # First visit all parents (reversed DFS)
             for parent in node.parents:
@@ -520,32 +494,19 @@ class ClassicalGenerator:
         ordered_commands = sorted(required_commands, key=lambda cmd: command_order.get(cmd, float('inf')))
         
         # Add a measure command for the target node
-        measure_cmd = f"measure : {target_node.identifier} -> M"
-        ordered_commands.append(measure_cmd)
+        # Create a new measure command for the target element
+        measure_command = Command('measure', [target_node.element], label_factory=self._get_unused_identifier, label_dict=self.identifiers)
+        measure_command.apply()
+        ordered_commands.append(measure_command)
         
         # Set the pruned command sequence
         self.pruned_command_sequence = ordered_commands
 
     def save_construction(self, filename: str, description: str = "Generated construction"):
-
         with open(filename, 'w') as f:
             f.write(f"# {description}\n")
             for cmd in self.pruned_command_sequence:
                 f.write(f"{cmd}\n")
-        # print(f"Saved construction to {filename}")
-
-
-
-# this one is contrained to generate problems which at some point involve constructing a polygon, 
-# and at one point rotating it around one of its vertices or its center.
-# later in the pipeline, the generated problem when translated into NL will have a different form:
-# the "answer" to the measure will be given, and the new question will be to find the angle of rotation, which will be omitted.
-class PolygonRotationGenerator(ClassicalGenerator):
-    def __init__(self, seed=None):
-        super().__init__(seed)
-
-    def _sample_command(self):
-        pass
 
 
 def main():
