@@ -13,7 +13,7 @@ global_timestamp = str(int(time.time()))
 # Add a file lock for thread-safe writing
 file_lock = threading.Lock()
 
-def generate_problem(contents: str) -> Optional[str]:
+def translate_problem(contents: str) -> Optional[str]:
     """
     Mechanically translate a geometric construction in command language to natural language.
     
@@ -31,8 +31,8 @@ def generate_problem(contents: str) -> Optional[str]:
         "point_l": "Construct a point {0} on line {1}.",
         "point_s": "Construct a point {0} on segment {1}.",
         "point_pm": "Construct a point {0} at distance {1} from point {2}.",
-        "point_at_distance": "Construct a point {0} at distance {1} from point {2} in a random direction.",
-        "point_at_distance_along_line": "Construct a point {0} on line {1}, at distance {2} from point {3}.",
+        "point_at_distance": "Construct point {0} at distance {2} from point {1} in a random direction.",
+        "point_at_distance_along_line": "Construct point {0} on line {1}, at distance {3} from point {2}.",
         
         # Line creation
         "line_pp": "Construct a line {0} through points {1} and {2}.",
@@ -48,15 +48,15 @@ def generate_problem(contents: str) -> Optional[str]:
         "orthogonal_line_ps": "Construct a line {0} through point {1} perpendicular to segment {2}.",
         
         # Angular bisectors
-        "angular_bisector_ll": "Construct the angle bisectors {0} of lines {1} and {2}.",
+        "angular_bisector_ll": "Construct the angle bisectors {0}, {1} of lines {2} and {3}.",
         "angular_bisector_ppp": "Construct the angle bisector {0} of angle {1}{2}{3}.",
-        "angular_bisector_ss": "Construct the angle bisectors {0} of segments {1} and {2}.",
+        "angular_bisector_ss": "Construct the angle bisectors {0}, {1} of segments {2} and {3}.",
         
         # Intersections
         "intersect_ll": "Find the intersection point {0} of lines {1} and {2}.",
-        "intersect_lc": "Find the intersection points {0} of line {1} and circle {2}.",
-        "intersect_cc": "Find the intersection points {0} of circles {1} and {2}.",
-        "intersect_cl": "Find the intersection points {0} of circle {1} and line {2}.",
+        "intersect_lc": "Find the intersection point {0} of line {1} and circle {2}.",
+        "intersect_cc": "Find the intersection point {0} of circles {1} and {2}.",
+        "intersect_cl": "Find the intersection point {0} of circle {1} and line {2}.",
         "intersect_lr": "Find the intersection point {0} of line {1} and ray {2}.",
         "intersect_ls": "Find the intersection point {0} of line {1} and segment {2}.",
         "intersect_rl": "Find the intersection point {0} of ray {1} and line {2}.",
@@ -71,7 +71,7 @@ def generate_problem(contents: str) -> Optional[str]:
         "circle_ppp": "Construct a circle {0} passing through points {1}, {2}, and {3}.",
         "circle_pm": "Construct a circle {0} with center {1} and radius {2}.",
         "circle_ps": "Construct a circle {0} with center {1} and radius equal to the length of segment {2}.",
-        
+        "circle_c": "Let {0} be the center of circle {1}.",
         # Segments
         "segment_pp": "Construct segment {0} from point {1} to point {2}.",
         
@@ -80,13 +80,14 @@ def generate_problem(contents: str) -> Optional[str]:
         "midpoint_s": "Find the midpoint {0} of segment {1}.",
         
         # Reflections/Mirrors
-        "mirror_pp": "Reflect point {0} across point {1}, and call the resulting point {2}.",
-        "mirror_pl": "Reflect point {0} across line {1}, and call the resulting point {2}.",
-        "mirror_pc": "Invert point {0} with respect to circle {1}, and call the resulting point {2}.",
-        "mirror_lp": "Reflect line {0} across point {1}, and call the resulting line {2}.",
-        "mirror_ll": "Reflect line {0} across line {1}, and call the resulting line {2}.",
-        "mirror_cl": "Reflect circle {0} across line {1}, and call the resulting circle {2}.",
-        "mirror_cp": "Reflect circle {0} across point {1}, and call the resulting circle {2}.",
+        "mirror_pp": "Reflect point {1} across point {2}, and call the resulting point {0}.",
+        "mirror_pl": "Reflect point {1} across line {2}, and call the resulting point {0}.",
+        "mirror_ps": "Reflect point {1} across segment {2}, and call the resulting point {0}.",
+        "mirror_pc": "Invert point {1} with respect to circle {2}, and call the resulting point {0}.",
+        "mirror_lp": "Reflect line {1} across point {2}, and call the resulting line {0}.",
+        "mirror_ll": "Reflect line {1} across line {2}, and call the resulting line {0}.",
+        "mirror_cl": "Reflect circle {1} across line {2}, and call the resulting circle {0}.",
+        "mirror_cp": "Reflect circle {1} across point {2}, and call the resulting circle {0}.",
         
         # Angles
         "angle_ppp": "Measure the angle {0} formed by points {1}, {2}, and {3}.",
@@ -94,19 +95,18 @@ def generate_problem(contents: str) -> Optional[str]:
         # Measures
         "distance_pp": "Measure the distance {0} between points {1} and {2}.",
         "radius_c": "Measure the radius {0} of circle {1}.",
-        "area": "Calculate the area {0} of the polygon formed by points {1}.",
         "area_P": "Calculate the area {0} of polygon {1}.",
         
         # Ray
         "ray_pp": "Construct ray {0} starting at point {1} and passing through point {2}.",
         
         # Rotations
-        "rotate_pap": "Rotate point {0} by angle {1} around point {2}, and call the resulting point {3}.",
-        "rotate_pAp": "Rotate point {0} by angle {1} around point {2}, and call the resulting point {3}.",
+        "rotate_pap": "Rotate point {1} by angle {2} around point {3}, and call the resulting point {0}.",
+        "rotate_pAp": "Rotate point {1} by angle {2} around point {3}, and call the resulting point {0}.",
         
         # Vectors
         "vector_pp": "Construct vector {0} from point {1} to point {2}.",
-        "translate_pv": "Translate point {0} by vector {1}, and call the resulting point {2}.",
+        "translate_pv": "Translate point {1} by vector {2}, and call the resulting point {0}.",
         
         # Arithmetic operations
         "sum_mm": "Calculate the sum {0} of measures {1} and {2}.",
@@ -121,10 +121,10 @@ def generate_problem(contents: str) -> Optional[str]:
         "power_si": "Calculate the power {0} of the length of segment {1} to the exponent {2}.",
         
         # Tangents
-        "tangent_pc": "Construct the tangent lines {0} from point {1} to circle {2}.",
+        "tangent_pc": "Construct the tangent line {0} from point {1} to circle {2}.",
         "polar_pc": "Construct the polar line {0} of point {1} with respect to circle {2}.",
         
-        # Boolean tests
+        # Boolean tests-- thankfully, these probably won't really be used 
         "are_collinear_ppp": "Test if points {1}, {2}, and {3} are collinear, and store the result in {0}.",
         "are_concurrent_lll": "Test if lines {1}, {2}, and {3} are concurrent, and store the result in {0}.",
         "are_concurrent": "Test if objects {1}, {2}, and {3} are concurrent, and store the result in {0}.",
@@ -147,17 +147,18 @@ def generate_problem(contents: str) -> Optional[str]:
         "are_perpendicular_ls": "Test if line {1} and segment {2} are perpendicular, and store the result in {0}.",
         "are_perpendicular_ss": "Test if segments {1} and {2} are perpendicular, and store the result in {0}.",
         
-        # Constants
-        "const": "Define a constant value {0} = {1}.",
-        "const int": "Define a constant integer {0} = {1}.",
-        
+        # polygon_ppi, a very special case
+        "polygon_ppi": "Construct a regular polygon with {3} sides starting from points {1} and {2}, and label the resulting polygon, segments and additional vertices collectively as {0}.",
+
         # Final measurement
         "measure": "Calculate and output the value of {1} as the answer {0}."
     }
     
     # Initialize the result list
     result_lines = []
-    
+    command_constructed_by = {}
+    # Some things, such as consts, phrases like "angle ABC" or "circle ABC" or "segment AB" should be referred to as such and not given a new identifier in natural language.
+    idents = {}
     # Process each line
     for line in contents.strip().split('\n'):
         # Skip empty lines and comments
@@ -170,6 +171,9 @@ def generate_problem(contents: str) -> Optional[str]:
             continue
             
         cmd = parts[0].strip()
+
+        if "const" in cmd:
+            idents[cmd] = parts[1].strip()
         
         # Split arguments into inputs and outputs
         args_parts = parts[1].split('->')
@@ -178,24 +182,85 @@ def generate_problem(contents: str) -> Optional[str]:
             
         inputs = [arg.strip() for arg in args_parts[0].split() if arg.strip()]
         outputs = [arg.strip() for arg in args_parts[1].split() if arg.strip()]
+        for output in outputs:
+            command_constructed_by[output] = cmd
+        inputs = [idents[arg] if arg in idents else arg for arg in inputs]
         
+        if cmd == "segment_pp":
+            idents[outputs[0]] = "segment " + idents[inputs[0]] + idents[inputs[1]]
+        if cmd == "angle_ppp":
+            idents[outputs[0]] = "angle " + idents[inputs[0]] + idents[inputs[1]] + idents[inputs[2]]
+        if cmd == "circle_ppp":
+            idents[outputs[0]] = "circle " + idents[inputs[0]] + idents[inputs[1]] + idents[inputs[2]]
+        
+        
+        if cmd == "polygon_ppi":
+            num_sides = inputs[-1]
+            polygon_name = outputs[0]
+            polygon_segment_idents = outputs[1:1+num_sides]
+            polygon_vertex_idents = inputs[0:2] + outputs[1+num_sides:]
+
+            for idx, segment_ident in enumerate(polygon_segment_idents):
+                idents[segment_ident] = "segment " + idents[polygon_vertex_idents[idx]] + idents[polygon_vertex_idents[(idx+1) % num_sides]]
+            translated_line = f"Construct a regular polygon with {num_sides} sides starting from points {inputs[0]} and {inputs[1]}, call the new vertices {polygon_vertex_idents[2:]}, and label the resulting polygon as {polygon_name}."
+            result_lines.append(translated_line)
+            continue
+        
+        if cmd == "measure":
+            if "polygon" in command_constructed_by[inputs[0]]:
+                translated_line = f"What is the area of {inputs[0]}?"
+                result_lines.append(translated_line)
+                continue
+            if "angle" in command_constructed_by[inputs[0]]:
+                translated_line = f"What is the measure of angle {inputs[0]}?"
+                result_lines.append(translated_line)
+                continue
+            if "segment" in command_constructed_by[inputs[0]]:
+                translated_line = f"What is the length of segment {inputs[0]}?"
+                result_lines.append(translated_line)
+                continue
+            translated_line = f"Compute the value of {inputs[0]}."
+            result_lines.append(translated_line)
+            continue
         # Get the template for this command
         template = command_templates.get(cmd)
         if not template:
             # Skip unknown commands
-            continue
-        
-        # Combine inputs and outputs for formatting
-        format_args = outputs + inputs
-        
-        # Format the template with the arguments
+            # continue
+            raise # for now
+
+        # Format the template differently based on the number of outputs
         try:
-            translated_line = template.format(*format_args)
+            # Commands with variable outputs (like intersections)
+            if len(outputs) > 1 and cmd.startswith(("intersect_", "tangent_")):
+                # Handle multiple output points
+                if len(outputs) == 2:
+                    output_str = f"{outputs[0]} and {outputs[1]}"
+                else:
+                    output_str = ", ".join(outputs[:-1]) + ", and " + outputs[-1]
+                
+                # Modify template format for multiple outputs
+                if "point" in template:
+                    template = template.replace("point {0}", "points " + output_str)
+                elif "line" in template:
+                    template = template.replace("line {0}", "lines " + output_str)
+                elif "bisector" in template:
+                    template = template.replace("bisector(s) {0}", "bisectors " + output_str)
+                    
+                # Apply the template with inputs only
+                translated_line = template.format(*inputs)
+            else:
+                # Standard case - single output or non-intersection commands
+                format_args = outputs + inputs
+                translated_line = template.format(*format_args)
+                
             result_lines.append(translated_line)
         except Exception as e:
-            # Skip lines that can't be formatted properly
-            raise # for now
+            # For debugging
+            print(f"Error formatting line: {line}")
+            print(f"Exception: {e}")
             # continue
+            raise # for now
     
     # Combine all translated lines into a coherent problem statement
     if not result_lines:
@@ -209,7 +274,7 @@ def generate_problem(contents: str) -> Optional[str]:
 
 def process_file_contents(filename: str, contents: str, answer: str, output_dir: Path, hash: str) -> None:
     print(f"Processing file: {filename}")
-    problem = generate_problem(contents)
+    problem = translate_problem(contents)
     if problem is None:
         return
     with file_lock:  # Use a lock to ensure thread-safe file writing

@@ -1,4 +1,65 @@
-- type annotate commands.py
+mechanical translator:
+[x] create first draft (thankfully this was easy because i factored translate_to_nl really well in the first place)
+- finish generating the basic dataset
+	[x] prereq to everything: the classical generator problem
+	- hardcode translator
+		[x] handle const command constructions specially
+	    [x] handle polygon command constructions specially
+		[x] handle measure commands specially
+		[x] check every single fucking command for syntactic correctness
+			[x] check to see all the commands are there (polygon I think is not)
+			[x] setup a split so that the process can be pipelined (find an example of command, look at command.py, look at translation)
+        [x] bonus: improve wording of several specific constructions
+		- bonus: do rewordings (and go through these manually, also)
+- finish generating the non-basic dataset #1
+
+- area takes variable inputs
+- polygon takes variable inputs
+- polygon_ppi has variable outputs
+
+
+- note construction.render() function for visualizing the polygon intersection problems.
+
+- encourage polygon_ppi() (this one is kind of tricky, maybe it shouldn't be done; maybe it should only happen towards the beginning)
+
+- implement line crossing problems.
+
+- implement rotation around a vertex of a polygon, rotation around the center of a polygon.
+
+- maybe just construct things of angle type directly and remove float literals.
+  - related: in the sample_command for this special problem construction, sample angles of interest (relative to internal angles of the polygon) far more often.
+
+
+-sample unused idents in a more variable way. polygons should have sequential idents but most other things should not. actually maybe even polygons should not. (don't do this one yet because it might mess up the NL translation)
+-whenever necessary, later, specify in nl translation prompts that everything is always in radians.
+
+- generally improve sampling heuristics, as needed, for variety.
+    - in particular, probably encourage the construction of n-gons for n up to 12.
+    - possibly, allow construction of a point a fixed fraction down a segment, which is common in AIME style constructions. need to define another numeric type like Proportion for this.
+
+
+- would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
+
+
+--REMEMBER to evaluate openthinker against qwen. it doesn't seem much better than qwen. 
+CUDA_VISIBLE_DEVICES=0,1 python grader.py --tensor_parallel_size 2 --model_shortname=openthinker --num_trials 5 natural_language_problems/1745289039_validated.jsonl --grade_all_problems
+
+## compositional problems
+- need to make sure that the model can't solve the test questions.
+
+-geo-arith problem: construct a regular polygon. set an arithmetic condition on when to draw lines between points
+-subproblems: determine when the arithmetic condition holds. determine what the result of drawing the lines is:
+
+-geo-combinatorics problem: aime dodecagon problem
+-subproblems: be generally good at combinatorics / counting intersections and shit. be better at geometry in the sense that we know how to handle rotations and shit.
+
+- general critique: by tuning the difficulty of the problem we can appear to achieve a result, assuming the fine tuning helps at all and the difficulty is approximately projected onto one dimension.
+- if composition is an entirely separate matter from capability at the subproblems then fine.
+
+**************************************************************88
+GRAVEYARD 20250423
+**************************************************************
+[x] type annotate commands.py
 
 
 objective is to make constructions randomly.
@@ -45,61 +106,10 @@ refactor:
 [x] need to see if Element class or similar contains most of the logic for what we need for Node, or if Node can simply hold Element to reduce complexity.
 [x] look at is_compatible_type(). is it still necessary? can't we just check type directly? only confusion is int and float, and generating new constants on the fly. this is already a bug.
 
-
-mechanical translator:
-[x] create first draft (thankfully this was easy because i factored translate_to_nl really well in the first place)
-- finish generating the basic dataset
-	[x] prereq to everything: the classical generator problem
-	- hardcode translator
-		- handle const command constructions specially
-		- handle measure commands specially
-		- check every single fucking command for syntactic correctness
-			- check to see all the commands are there (polygon I think is not)
-			- setup a split so that the process can be pipelined (find an example of command, look at command.py, look at translation)
-		- bonus: 
-- finish generating the non-basic dataset #1
-
-
-- note construction.render() function for visualizing the polygon intersection problems.
-
-- encourage polygon_ppi() (this one is kind of tricky, maybe it shouldn't be done; maybe it should only happen towards the beginning)
-
-- implement line crossing problems.
-
-- implement rotation around a vertex of a polygon, rotation around the center of a polygon.
-
-- maybe just construct things of angle type directly and remove float literals.
-  - related: in the sample_command for this special problem construction, sample angles of interest (relative to internal angles of the polygon) far more often.
-
-
--sample unused idents in a more variable way. polygons should have sequential idents but most other things should not. actually maybe even polygons should not. (don't do this one yet because it might mess up the NL translation)
--whenever necessary, later, specify in nl translation prompts that everything is always in radians.
+- most ancestors calculation is currently heuristic. also, in general it is not clear that it gives you the characteristics that generate good constructions.
+- generator does a bunch of work at initialization time. if too slow, measure it to reduce overhead.
 
 - i think we want something slightly more sophisticated-- we want to measure something that requires a longer deduction at the end.
 - *how do we ensure that most of the commands in the construction are actually necessary?* -- I think it should be possible to automatically prune unused commands from the construction.
   - note this may be achievable with a dependency graph; note this may not be strictly necessary because the pruning algorithm might be pretty easy.
 - starting heuristics, constructing points and defining one numeric literal are too rigid. but i think good enough for now until other more obvious issues are solved.
-- generally improve sampling heuristics, as needed, for variety.
-    - in particular, probably encourage the construction of n-gons for n up to 12.
-    - possibly, allow construction of a point a fixed fraction down a segment, which is common in AIME style constructions. need to define another numeric type like Proportion for this.
-
-
-- would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
-- most ancestors calculation is currently heuristic. also, in general it is not clear that it gives you the characteristics that generate good constructions.
-- generator does a bunch of work at initialization time. if too slow, measure it to reduce overhead.
-
-
---REMEMBER to evaluate openthinker against qwen. it doesn't seem much better than qwen. 
-CUDA_VISIBLE_DEVICES=0,1 python grader.py --tensor_parallel_size 2 --model_shortname=openthinker --num_trials 5 natural_language_problems/1745289039_validated.jsonl --grade_all_problems
-
-## compositional problems
-- need to make sure that the model can't solve the test questions.
-
--geo-arith problem: construct a regular polygon. set an arithmetic condition on when to draw lines between points
--subproblems: determine when the arithmetic condition holds. determine what the result of drawing the lines is:
-
--geo-combinatorics problem: aime dodecagon problem
--subproblems: be generally good at combinatorics / counting intersections and shit. be better at geometry in the sense that we know how to handle rotations and shit.
-
-- general critique: by tuning the difficulty of the problem we can appear to achieve a result, assuming the fine tuning helps at all and the difficulty is approximately projected onto one dimension.
-- if composition is an entirely separate matter from capability at the subproblems then fine.

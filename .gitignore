@@ -6,4 +6,6 @@ failed/
 generated_constructions/
 
 *.un~
+*.swp
+*.swo
 .vscode/

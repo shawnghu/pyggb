@@ -147,7 +147,8 @@ def are_perpendicular_ls(l: gt.Line, s: gt.Segment) -> gt.Boolean:
 def are_perpendicular_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Boolean:
     return are_perpendicular_ll(s1, s2)
 
-def area(*points: gt.Point) -> gt.Measure:
+def area_P(polygon: gt.Polygon) -> gt.Measure:
+    points = [gt.Point(p) for p in polygon.points]
     p0 = points[0].a
     vecs = [p.a - p0 for p in points[1:]]
     cross_sum = sum(
@@ -155,10 +156,6 @@ def area(*points: gt.Point) -> gt.Measure:
         for v1, v2 in zip(vecs, vecs[1:])
     )
     return gt.Measure(abs(cross_sum)/2, 2)
-
-def area_P(polygon: gt.Polygon) -> gt.Measure:
-    points = [gt.Point(p) for p in polygon.points]
-    return area(*points)
 
 def center_c(c: gt.Circle) -> gt.Point:
     return gt.Point(c.c)
@@ -463,13 +460,10 @@ def polygon_ppi(p1: gt.Point, p2: gt.Point, n: int) -> List[Union[gt.Polygon, gt
     ]
     return [gt.Polygon(raw_points)] + segments + points
 
-def polygon(*points: gt.Point) -> List[Union[gt.Polygon, gt.Segment]]:
-    raw_points = [p.a for p in points]
-    segments = [
-        gt.Segment(p1, p2)
-        for p1,p2 in zip(raw_points, raw_points[1:] + raw_points[:1])
-    ]
-    return [gt.Polygon(raw_points)] + segments
+# note: no polygon command for arbitrary points, since we could not ensure the points would be listed in order
+# triangle and quadrilateral could be defined with explicit casing
+# but mech translator and classical generator would need to handle the output args specially
+# also, triangles should have a lot of special operations, such as incircle, circumcircle, etc.
 
 def power_mi(m: gt.Measure, i: int) -> gt.Measure:
     assert(i == 2)
@@ -499,14 +493,6 @@ def rotate_pAp(point: gt.Point, angle_size: gt.AngleSize, by_point: gt.Point) ->
 
 def segment_pp(p1: gt.Point, p2: gt.Point) -> gt.Segment:
     return gt.Segment(p1.a, p2.a)
-
-def semicircle(p1: gt.Point, p2: gt.Point) -> gt.Arc:
-    vec = gt.a_to_cpx(p1.a - p2.a)
-    return gt.Arc(
-        (p1.a + p2.a)/2,
-        abs(vec)/2,
-        [np.angle(v) for v in (-vec, vec)]
-    )
 
 def sum_mm(m1: Union[gt.Measure, float, int], m2: Union[gt.Measure, float, int]) -> gt.Measure:
     # Handle both Measure objects and numeric values
@@ -576,23 +562,7 @@ def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, dista
     # Move along line direction by the specified distance
     return gt.Point(closest_pt + line.v * distance)
 
-def point_pmpm(point: gt.Point, measure: gt.Measure) -> gt.Point:
+def point_pm(point: gt.Point, measure: gt.Measure) -> gt.Point:
     """Create a point at a specified distance from an existing point in a random direction."""
     assert(measure.dim == 1 and measure.x > 0)
     return gt.Point(point.a + measure.x * gt.random_direction())
-
-# New measurement functions
-
-def magnitude_v(vector: gt.Vector) -> gt.Measure:
-    """Measure the magnitude (length) of a vector and return as a Measure object."""
-    return gt.Measure(np.linalg.norm(vector.v), 1)  # Dimension 1 for length
-
-def arc_length_C(arc: gt.Arc) -> gt.Measure:
-    """Measure the length of an arc and return as a Measure object."""
-    angle_diff = abs(arc.angles[1] - arc.angles[0])
-    return gt.Measure(arc.r * angle_diff, 1)  # Dimension 1 for length
-
-def central_angle_C(arc: gt.Arc) -> gt.Measure:
-    """Measure the central angle of an arc in radians and return as a Measure object."""
-    angle_diff = abs(arc.angles[1] - arc.angles[0])
-    return gt.Measure(angle_diff, 0)  # Dimension 0 for angle

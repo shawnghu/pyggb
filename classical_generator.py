@@ -120,8 +120,9 @@ class ClassicalGenerator:
             np.random.seed(seed)
         
         # Initialize a pool of identifiers to use
-        self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
-        self.identifier_pool += [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
+        # bonus: rework this just so that polygons are labeled with conseuctive letters 
+        self.identifier_pool = random.shuffle([chr(i) for i in range(65, 91)])  # A-Z
+        self.identifier_pool += random.shuffle([f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)])  # A1-Z9
         
         # Keep track of used identifiers and their types
         self.identifiers: Dict[str, Element] = {}
@@ -260,6 +261,9 @@ class ClassicalGenerator:
             if 'ratio' in cmd_name:
                 if random.random() < 0.8:
                     continue
+            cmd_info = self.available_commands[cmd_name]
+            if cmd_info['return_type'] == gt.Boolean:
+                continue
             yield cmd_name
 
     def _execute_new_command(self) -> Tuple[List[Element], Command]:
@@ -271,7 +275,7 @@ class ClassicalGenerator:
         for cmd_name in self._sample_commands():
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
-            
+
             # Special case for commands that create points without parameters
             if cmd_name == 'point_' and len(param_types) == 0:
                 # Try to execute the command directly
@@ -280,32 +284,7 @@ class ClassicalGenerator:
                     return [], command
                 else:
                     continue
-                
-            # Special case for polygon command - needs at least 3 points
-            if cmd_name == 'polygon':
-                # Check if we have at least 3 point elements
-                point_elements = []
-                for element in self.identifiers.values():
-                    if isinstance(element.data, gt.Point):
-                        point_elements.append(element)
-                
-                if len(point_elements) < 3:
-                    continue  # Skip polygon command if we don't have enough points
-                
-                # Choose at least 3 and up to 12 unique point elements
-                num_points = min(random.randint(3, 12), len(point_elements))
-                
-                # Shuffle and pick points
-                random.shuffle(point_elements)
-                selected_points = point_elements[:num_points]
-                
-                # Try to execute the command
-                success, command = self._try_apply_command(cmd_name, selected_points)
-                if success:
-                    return selected_points, command
-                else:
-                    continue
-                
+
             # Skip commands that need parameters if we don't have any elements yet
             if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
                 continue
