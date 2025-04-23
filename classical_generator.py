@@ -121,8 +121,11 @@ class ClassicalGenerator:
         
         # Initialize a pool of identifiers to use
         # bonus: rework this just so that polygons are labeled with conseuctive letters 
-        self.identifier_pool = random.shuffle([chr(i) for i in range(65, 91)])  # A-Z
-        self.identifier_pool += random.shuffle([f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)])  # A1-Z9
+        self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
+        random.shuffle(self.identifier_pool)
+        extras = [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
+        random.shuffle(extras)
+        self.identifier_pool += extras
         
         # Keep track of used identifiers and their types
         self.identifiers: Dict[str, Element] = {}

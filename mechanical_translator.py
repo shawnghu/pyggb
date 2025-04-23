@@ -55,6 +55,7 @@ def translate_problem(contents: str) -> Optional[str]:
         # Intersections
         "intersect_ll": "Find the intersection point {0} of lines {1} and {2}.",
         "intersect_lc": "Find the intersection point {0} of line {1} and circle {2}.",
+        "intersect_cs": "Find the intersection point {0} of circle {1} and segment {2}.",
         "intersect_cc": "Find the intersection point {0} of circles {1} and {2}.",
         "intersect_cl": "Find the intersection point {0} of circle {1} and line {2}.",
         "intersect_lr": "Find the intersection point {0} of line {1} and ray {2}.",
@@ -71,7 +72,7 @@ def translate_problem(contents: str) -> Optional[str]:
         "circle_ppp": "Construct a circle {0} passing through points {1}, {2}, and {3}.",
         "circle_pm": "Construct a circle {0} with center {1} and radius {2}.",
         "circle_ps": "Construct a circle {0} with center {1} and radius equal to the length of segment {2}.",
-        "circle_c": "Let {0} be the center of circle {1}.",
+        "center_c": "Let {0} be the center of circle {1}.",
         # Segments
         "segment_pp": "Construct segment {0} from point {1} to point {2}.",
         
@@ -164,7 +165,13 @@ def translate_problem(contents: str) -> Optional[str]:
         # Skip empty lines and comments
         if not line.strip() or line.strip().startswith('#'):
             continue
-        
+
+        # this has to go at the very beginning because const command syntax is different from every other: contains no ':'
+        if "const" in line:
+            output = line.strip().split(' ')[-1]
+            value = line.strip().split(' ')[2]
+            idents[output] = value
+
         # Split the line into command and arguments
         parts = line.split(':')
         if len(parts) < 2:
@@ -172,50 +179,48 @@ def translate_problem(contents: str) -> Optional[str]:
             
         cmd = parts[0].strip()
 
-        if "const" in cmd:
-            idents[cmd] = parts[1].strip()
         
         # Split arguments into inputs and outputs
         args_parts = parts[1].split('->')
         if len(args_parts) < 2:
             continue
             
-        inputs = [arg.strip() for arg in args_parts[0].split() if arg.strip()]
+        raw_inputs = [arg.strip() for arg in args_parts[0].split() if arg.strip()]
         outputs = [arg.strip() for arg in args_parts[1].split() if arg.strip()]
         for output in outputs:
             command_constructed_by[output] = cmd
-        inputs = [idents[arg] if arg in idents else arg for arg in inputs]
+        inputs = [idents[arg] if arg in idents else arg for arg in raw_inputs]
         
         if cmd == "segment_pp":
-            idents[outputs[0]] = "segment " + idents[inputs[0]] + idents[inputs[1]]
+            idents[outputs[0]] = "segment " + inputs[0] + inputs[1]
         if cmd == "angle_ppp":
-            idents[outputs[0]] = "angle " + idents[inputs[0]] + idents[inputs[1]] + idents[inputs[2]]
+            idents[outputs[0]] = "angle " + inputs[0] + inputs[1] + inputs[2]
         if cmd == "circle_ppp":
-            idents[outputs[0]] = "circle " + idents[inputs[0]] + idents[inputs[1]] + idents[inputs[2]]
+            idents[outputs[0]] = "circle " + inputs[0] + inputs[1] + inputs[2]
         
         
         if cmd == "polygon_ppi":
-            num_sides = inputs[-1]
+            num_sides = int(inputs[-1])
             polygon_name = outputs[0]
             polygon_segment_idents = outputs[1:1+num_sides]
             polygon_vertex_idents = inputs[0:2] + outputs[1+num_sides:]
 
             for idx, segment_ident in enumerate(polygon_segment_idents):
-                idents[segment_ident] = "segment " + idents[polygon_vertex_idents[idx]] + idents[polygon_vertex_idents[(idx+1) % num_sides]]
+                idents[segment_ident] = "segment " + polygon_vertex_idents[idx] + polygon_vertex_idents[(idx+1) % num_sides]
             translated_line = f"Construct a regular polygon with {num_sides} sides starting from points {inputs[0]} and {inputs[1]}, call the new vertices {polygon_vertex_idents[2:]}, and label the resulting polygon as {polygon_name}."
             result_lines.append(translated_line)
             continue
         
         if cmd == "measure":
-            if "polygon" in command_constructed_by[inputs[0]]:
-                translated_line = f"What is the area of {inputs[0]}?"
+            if "polygon" in command_constructed_by[raw_inputs[0]]:
+                translated_line = f"What is the area of {raw_inputs[0]}?"
                 result_lines.append(translated_line)
                 continue
-            if "angle" in command_constructed_by[inputs[0]]:
-                translated_line = f"What is the measure of angle {inputs[0]}?"
+            if "angle" in command_constructed_by[raw_inputs[0]]:
+                translated_line = f"What is the measure of angle {raw_inputs[0]}?"
                 result_lines.append(translated_line)
                 continue
-            if "segment" in command_constructed_by[inputs[0]]:
+            if "segment" in command_constructed_by[raw_inputs[0]]:
                 translated_line = f"What is the length of segment {inputs[0]}?"
                 result_lines.append(translated_line)
                 continue
@@ -227,6 +232,7 @@ def translate_problem(contents: str) -> Optional[str]:
         if not template:
             # Skip unknown commands
             # continue
+            print(f"Unknown command: {cmd}")
             raise # for now
 
         # Format the template differently based on the number of outputs
@@ -246,7 +252,7 @@ def translate_problem(contents: str) -> Optional[str]:
                     template = template.replace("line {0}", "lines " + output_str)
                 elif "bisector" in template:
                     template = template.replace("bisector(s) {0}", "bisectors " + output_str)
-                    
+                template = template.replace("{1}", "{0}").replace("{2}", "{1}")
                 # Apply the template with inputs only
                 translated_line = template.format(*inputs)
             else:
@@ -273,7 +279,6 @@ def translate_problem(contents: str) -> Optional[str]:
     return final_result
 
 def process_file_contents(filename: str, contents: str, answer: str, output_dir: Path, hash: str) -> None:
-    print(f"Processing file: {filename}")
     problem = translate_problem(contents)
     if problem is None:
         return
@@ -335,11 +340,10 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
         futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
         for future in concurrent.futures.as_completed(futures):
             filename = futures[future]
-            try:
-                future.result()
-                print(f"Completed processing: {filename}")
-            except Exception as exc:
-                print(f"Processing of {filename} generated an exception: {exc}")
+            #try:
+            future.result()
+            # except Exception as exc:
+            #     print(f"Processing of {filename} generated an exception: {exc}")
 
 def read_hashes(output_dir: Path) -> Dict[str, bool]:
     hashes = {}

@@ -562,7 +562,7 @@ def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, dista
     # Move along line direction by the specified distance
     return gt.Point(closest_pt + line.v * distance)
 
-def point_pm(point: gt.Point, measure: gt.Measure) -> gt.Point:
+def point_pm(point: gt.Point, distance: int) -> gt.Point:
     """Create a point at a specified distance from an existing point in a random direction."""
-    assert(measure.dim == 1 and measure.x > 0)
-    return gt.Point(point.a + measure.x * gt.random_direction())
+    assert(distance > 0)
+    return gt.Point(point.a + distance * gt.random_direction())
