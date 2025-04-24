@@ -172,8 +172,9 @@ class Angle:
 
         if self.angle < 0:
             self.angle += 2*np.pi
-        #    self.angle = -self.angle
-        #    v1,v2 = v2,v1
+        if self.angle > np.pi: # get the smaller angle
+            self.angle = 2*np.pi - self.angle
+            v1, v2 = v2, v1
 
         self.start_angle = np.angle(a_to_cpx(v1))
         self.end_angle = self.start_angle + self.angle

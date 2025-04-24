@@ -132,15 +132,11 @@ class ClassicalGenerator:
         
         # Get all available commands from the commands module
         self.available_commands = self._get_commands()
-        
-        # Command sequence
-        self.command_sequence = []  # Now stores Command objects
-        
-        # Dependency graph
-        self.dependency_graph = None
-        
-        # Pruned command sequence
-        self.pruned_command_sequence = None
+
+        self.command_sequence: List[Command] = []
+        self.dependency_graph = DependencyGraph()
+        self.pruned_command_sequence: List[Command] = []
+        self.made_polygon_already: bool = False
 
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
@@ -209,7 +205,7 @@ class ClassicalGenerator:
             if not compatible or random.random() < 0.8:
                 # Create a new constant with a random value
                 if numeric_type == int:
-                    value = random.randint(1, 10)
+                    value = random.randint(1, 12)
                     element, const_command = self._add_constant('int', value)
                     # Return the newly created element
                     return [element]
@@ -245,30 +241,43 @@ class ClassicalGenerator:
     def _sample_commands(self) -> Generator[str, None, None]:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
-        command_names.append('polygon_ppi') # double the probability of polygon construction
+        if not self.made_polygon_already:
+            command_names.append('polygon_ppi') # double the probability of polygon construction
         random.shuffle(command_names)
         
         for cmd_name in command_names:
             if 'prove' in cmd_name or 'measure' in cmd_name:
                 continue # these are special commands, not part of constructions
             # heuristics for not making boring things
+            # also minus and power make bad (ambiguous or dependent on calculation precision) problems
             if 'minus' in cmd_name:
-                if cmd_name != 'minus_mm':
-                    continue
-                if random.random() < 0.8:
-                    continue
+                continue
             if 'sum' in cmd_name:
-                if cmd_name != 'sum_mm':
-                    continue
-                if random.random() < 0.8:
-                    continue
+                continue
             if 'ratio' in cmd_name:
-                if random.random() < 0.8:
-                    continue
+                continue
+            if 'product' in cmd_name:
+                continue
+            if 'power_' in cmd_name:
+                continue
+
+            
             cmd_info = self.available_commands[cmd_name]
             if cmd_info['return_type'] == gt.Boolean:
                 continue
+            # discourage multiple polygons
+            if self.made_polygon_already and cmd_name == 'polygon_ppi':
+                if random.random() < 0.6:
+                    continue
+            if cmd_name == 'polygon_ppi':
+                self.made_polygon_already = True
+            
             yield cmd_name
+
+    def _sample_polygon_sides(self) -> int:
+        sides = [4, 5, 6, 7, 8, 9, 10, 11, 12]
+        weights = [1, 2, 4, 1, 4, 1, 2, 1, 4]
+        return random.choices(sides, weights)[0]
 
     def _execute_new_command(self) -> Tuple[List[Element], Command]:
         """
@@ -318,11 +327,7 @@ class ClassicalGenerator:
             
             if valid_params:
                 if cmd_name == 'polygon_ppi':
-                    try: 
-                        if input_elements[2].data <= 3: # 3 or fewer sides not valid. triangles constructed separately.
-                            continue
-                    except:
-                        print("ya messed up passing the right arg in")
+                    input_elements[2].data = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
                 # Try to execute the command
                 success, command = self._try_apply_command(cmd_name, input_elements)
                 if success:
@@ -370,8 +375,6 @@ class ClassicalGenerator:
 
     def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
-        # Initialize the dependency graph
-        self.dependency_graph = DependencyGraph()
         commands_added = 0
         
         # We need to start with a point
@@ -487,9 +490,33 @@ class ClassicalGenerator:
         measure_command = Command('measure', [target_node.element], label_factory=self._get_unused_identifier, label_dict=self.identifiers)
         measure_command.apply()
         ordered_commands.append(measure_command)
-        
-        # Set the pruned command sequence
+
+
+        # reassign identifiers starting from the beginning of the ident pool (shuffled, but with single char idents first),
+        # so that the output is more readable
+        # a funny thing happened here:
+        # you don't have to rename the input elements, because the semantics of the rest of this program involve manipulating actual element objects.
+        # so when you rename the output elements, you will rename every element which is actually used in the command sequence,
+        # and the element object will be updated, passed around, and have the correct label when it is used as an input element.
+        # in fact, trying to rename the input element will fail, because it has already been renamed.
+        ident_idx = 0
+        # mapping = {}
+        for command in ordered_commands:
+            if isinstance(command, ConstCommand):
+                # mapping[command.element.label] = self.identifier_pool[ident_idx]
+                command.element.label = self.identifier_pool[ident_idx]
+                ident_idx += 1
+                continue
+            # for input_elem in command.input_elements:
+            #    input_elem.label = mapping[input_elem.label]
+            for output_elem in command.output_elements:
+                # mapping[output_elem.label] = self.identifier_pool[ident_idx]
+                output_elem.label = self.identifier_pool[ident_idx]
+                ident_idx += 1
+
+        # effectively the retval
         self.pruned_command_sequence = ordered_commands
+
 
     def save_construction(self, filename: str, description: str = "Generated construction"):
         with open(filename, 'w') as f:

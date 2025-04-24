@@ -2,30 +2,16 @@ mechanical translator:
 
 - now there are a couple of errors:
 [x] polygons can be made with less than 3 sides i think
+    [x] also improve polygon sampling generally
 [x] some repetition of the word "segment", maybe "angle".
-- angles should be specified to be measured in radians.
+[x] angles should be specified to be measured in radians.
 
-- also, reassign the idents, 'cause the existing problems are ass
+[x] also, reassign the idents, 'cause the existing problems are ass
 
-- more generally, sample problems with o4 with a normal validation setup, and see what the extant problems are
 
-[x] create first draft (thankfully this was easy because i factored translate_to_nl really well in the first place)
-- finish generating the basic dataset
-	[x] prereq to everything: the classical generator problem
-	- hardcode translator
-		[x] handle const command constructions specially
-	    [x] handle polygon command constructions specially
-		[x] handle measure commands specially
-		[x] check every single fucking command for syntactic correctness
-			[x] check to see all the commands are there (polygon I think is not)
-			[x] setup a split so that the process can be pipelined (find an example of command, look at command.py, look at translation)
-        [x] bonus: improve wording of several specific constructions
-		- bonus: do rewordings (and go through these manually, also)
-- finish generating the non-basic dataset #1
-
-- area takes variable inputs
-- polygon takes variable inputs
-- polygon_ppi has variable outputs
+fix the problem generator more:
+- see what is up with all the probably-hard questions
+- sample problems with o4 with a normal validation setup, and see what the approval rate is; 
 
 
 - note construction.render() function for visualizing the polygon intersection problems.
@@ -66,6 +52,27 @@ CUDA_VISIBLE_DEVICES=0,1 python grader.py --tensor_parallel_size 2 --model_short
 - general critique: by tuning the difficulty of the problem we can appear to achieve a result, assuming the fine tuning helps at all and the difficulty is approximately projected onto one dimension.
 - if composition is an entirely separate matter from capability at the subproblems then fine.
 
+**************************************************************88
+GRAVEYARD 20250424
+**************************************************************
+
+[x] create first draft (thankfully this was easy because i factored translate_to_nl really well in the first place)
+- finish generating the basic dataset
+	[x] prereq to everything: the classical generator problem
+	- hardcode translator
+		[x] handle const command constructions specially
+	    [x] handle polygon command constructions specially
+		[x] handle measure commands specially
+		[x] check every single fucking command for syntactic correctness
+			[x] check to see all the commands are there (polygon I think is not)
+			[x] setup a split so that the process can be pipelined (find an example of command, look at command.py, look at translation)
+        [x] bonus: improve wording of several specific constructions
+		- bonus: do rewordings (and go through these manually, also)
+- finish generating the non-basic dataset #1
+
+[x] area takes variable inputs
+[x] polygon takes variable inputs
+[x] polygon_ppi has variable outputs
 **************************************************************88
 GRAVEYARD 20250423
 **************************************************************
