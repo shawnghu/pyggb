@@ -137,6 +137,7 @@ class ClassicalGenerator:
         self.dependency_graph = DependencyGraph()
         self.pruned_command_sequence: List[Command] = []
         self.made_polygon_already: bool = False
+        self.made_triangle_already: bool = False
 
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
@@ -165,7 +166,6 @@ class ClassicalGenerator:
                 'param_types': param_types,
                 'return_type': return_type
             }
-            
         return commands_dict
 
     def _get_unused_identifier(self) -> str:
@@ -242,7 +242,10 @@ class ClassicalGenerator:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
         if not self.made_polygon_already:
-            command_names.append('polygon_ppi') # double the probability of polygon construction
+            command_names.append('polygon_from_center_and_circumradius') # double the probability of polygon construction
+        if not self.made_triangle_already:
+            command_names.append('triangle_ppp')
+            command_names.append('triangle_ppp')
         random.shuffle(command_names)
         
         for cmd_name in command_names:
@@ -266,10 +269,10 @@ class ClassicalGenerator:
             if cmd_info['return_type'] == gt.Boolean:
                 continue
             # discourage multiple polygons
-            if self.made_polygon_already and cmd_name == 'polygon_ppi':
+            if self.made_polygon_already and cmd_name == 'polygon_from_center_and_circumradius':
                 if random.random() < 0.6:
                     continue
-            if cmd_name == 'polygon_ppi':
+            if cmd_name == 'polygon_from_center_and_circumradius':
                 self.made_polygon_already = True
             
             yield cmd_name
@@ -297,6 +300,16 @@ class ClassicalGenerator:
                     return [], command
                 else:
                     continue
+            num_points = len([x for x in self.identifiers.values() if isinstance(x.data, gt.Point)])
+            if cmd_name == 'triangle_ppp':
+                if (num_points <= 2):
+                    success, command = self._try_apply_command('point_', [])
+                    if success:
+                        return [], command
+                    else:
+                        continue
+                else:
+                    self.made_triangle_already = True
 
             # Skip commands that need parameters if we don't have any elements yet
             if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
@@ -324,10 +337,9 @@ class ClassicalGenerator:
                 selected = random.choice(available_elements)
                 input_elements.append(selected)
                 used_elements.add(selected)  # Mark as used
-            
             if valid_params:
-                if cmd_name == 'polygon_ppi':
-                    input_elements[2].data = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
+                if cmd_name == 'polygon_from_center_and_circumradius':
+                    input_elements[0].data = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
                 # Try to execute the command
                 success, command = self._try_apply_command(cmd_name, input_elements)
                 if success:
@@ -387,12 +399,8 @@ class ClassicalGenerator:
         
         commands_added += 1
         
-        # Try to add commands until we reach the target
-        max_attempts = 100  # Prevent infinite loops
-        attempt = 0
         
-        while commands_added < num_commands and attempt < max_attempts:
-            attempt += 1
+        while commands_added < num_commands:
             
             # Sample a command that can be executed
             cmd_sample = self._execute_new_command()
@@ -403,35 +411,13 @@ class ClassicalGenerator:
             
             # Add the command to our sequence
             self.command_sequence.append(command)
-            
+
             # Update dependency graph
             self._update_dependency_graph(command, input_elements, command.output_elements)
             
             commands_added += 1
         
-        # Add a measure command at the end, choosing a measurable value
-        measurable_elements = []
-        
-        for element in self.identifiers.values():
-            # Check if the element's data type is in MEASURABLE_TYPES
-            if any(isinstance(element.data, m_type) for m_type in MEASURABLE_TYPES):
-                measurable_elements.append(element)
-        
-        if measurable_elements:
-            measure_target = random.choice(measurable_elements)
-            
-            # Try to execute the measure command
-            success, command = self._try_apply_command('measure', [measure_target])
-            
-            if success:
-                # Add the measure command
-                self.command_sequence.append(command)
-                
-                # Update dependency graph
-                self._update_dependency_graph(command, [measure_target], command.output_elements)
-        
-        # Set pruned_command_sequence to the full sequence for now
-        self.pruned_command_sequence = self.command_sequence.copy()
+        # We no longer add a measure command here, as it's added in compute_longest_construction
         
         return self.command_sequence
 
@@ -440,9 +426,6 @@ class ClassicalGenerator:
         Find the measurable quantity with the most ancestors and create a pruned
         construction sequence that includes only the commands needed to construct it.
         """
-        if not self.dependency_graph:
-            self.pruned_command_sequence = self.command_sequence.copy()
-            return
             
         # Find all measurable quantities
         measurable_nodes = []
@@ -514,8 +497,21 @@ class ClassicalGenerator:
                 output_elem.label = self.identifier_pool[ident_idx]
                 ident_idx += 1
 
+        all_constructed_points = []
+        for command in ordered_commands:
+            if isinstance(command, ConstCommand):
+                continue
+            for output_elem in command.output_elements:
+                if isinstance(output_elem, gt.Point):
+                    if any(np.isclose(output_elem.a, pt.a) for pt in all_constructed_points):
+                        return False # just throw this one away; there's a degeneracy somewhere
+                    else:
+                        all_constructed_points.append(output_elem)
         # effectively the retval
         self.pruned_command_sequence = ordered_commands
+        return True
+
+        
 
 
     def save_construction(self, filename: str, description: str = "Generated construction"):
@@ -542,7 +538,9 @@ def main():
         generator.generate_construction(num_commands=args.num_commands)
         
         # Prune the construction to include only essential commands
-        generator.compute_longest_construction()
+        success = generator.compute_longest_construction()
+        if not success:
+            continue
         
         # Create unique filename if generating multiple constructions
         filename = os.path.join(args.output_dir, f"construction_{i+1}.txt")

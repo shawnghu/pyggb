@@ -1,2 +1,0 @@
-right_triangle_hypotenuse.txt: 4.0
-altitude_to_base_ratio_triangle.txt: 0.48

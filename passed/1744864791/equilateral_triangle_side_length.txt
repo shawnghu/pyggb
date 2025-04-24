@@ -1,8 +1,0 @@
-# Construct equilateral triangle and measure side length
-point :  -> A
-const int 7 -> side_len
-point_pm : A side_len -> B
-point_pmpm : A side_len B side_len -> C
-segment_pp : A B -> AB
-distance_pp : A B -> side
-measure : side -> result

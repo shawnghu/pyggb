@@ -1,2 +1,0 @@
-pentagon_incircle_radius.txt: 4.1291
-hexagon_side_length.txt: 7.0

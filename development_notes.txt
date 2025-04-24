@@ -9,7 +9,7 @@ mechanical translator:
 [x] also, reassign the idents, 'cause the existing problems are ass
 [x] add specs to the generated problem jsons.
 [x] encourage polygon_ppi() (this one is kind of tricky, maybe it shouldn't be done; maybe it should only happen towards the beginning)
-
+- implement more commands: for triangles, to construct polygon from center with circumradius/vertex distance. polygon_ppi seems just to really not work.
 - why is openthinker so fricken slow? it actually creates problems for the pipeline
 
 fix the problem generator more:

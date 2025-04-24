@@ -1,2 +1,0 @@
-orthocenter_of_triangle.txt: 0.0
-construct_bisector_length.txt: 0.0

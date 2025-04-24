@@ -1,2 +1,0 @@
-diameter_to_radius_ratio.txt: 2.0
-isosceles_altitude_5_5_6.txt: 4.0

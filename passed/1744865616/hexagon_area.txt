@@ -1,8 +1,0 @@
-# Regular hexagon area measurement
-point :  -> A
-const int 2 -> side_length
-point_pm : A side_length -> B
-const int 6 -> num_sides
-polygon_ppi : A B num_sides -> hexagon AB BC CD DE EF FA C D E F
-area_P : hexagon -> area_hex
-measure : area_hex -> result

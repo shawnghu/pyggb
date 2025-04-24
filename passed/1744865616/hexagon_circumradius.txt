@@ -1,9 +1,0 @@
-# Hexagon circumradius measurement
-point :  -> A
-const int 3 -> side_length
-point_pm : A side_length -> B
-const int 6 -> num_sides
-polygon_ppi : A B num_sides -> hexagon AB BC CD DE EF FA C D E F
-circle_ppp : A B C -> circ
-radius_c : circ -> radius
-measure : radius -> result

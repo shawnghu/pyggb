@@ -3,6 +3,7 @@ import argparse
 import glob
 from typing import List, Optional, Dict
 from pathlib import Path
+import pdb
 import time
 import hashlib
 import time
@@ -454,7 +455,6 @@ def translate_problem(contents: str) -> Optional[str]:
             "Determine point {0} as the image of point {1} when translated by vector {2}.",
             "Construct point {0} by shifting point {1} in the direction and magnitude of vector {2}."
         ],
-        
         # Tangents
         "tangent_pc": [
             "Construct the tangent line {0} from point {1} to circle {2}.",
@@ -470,49 +470,60 @@ def translate_problem(contents: str) -> Optional[str]:
             "Form the polar line {0} corresponding to point {1} with respect to circle {2}.",
             "Establish the polar line {0} of point {1} in relation to circle {2}."
         ],
+        
+        # Triangle-related commands
+        "triangle_ppp": [
+            "Construct triangle {0} with vertices at points {1}, {2}, and {3}.",
+            "Draw triangle {0} using points {1}, {2}, and {3} as vertices.",
+            "Create triangle {0} whose vertices are points {1}, {2}, and {3}."
+        ],
+        "circumcircle_t": [
+            "Construct the circumcircle {0} of triangle {1}.",
+            "Draw the circle {0} that passes through all three vertices of triangle {1}.",
+            "Create the circumscribed circle {0} of triangle {1}."
+        ],
+        "circumcenter_t": [
+            "Find the circumcenter {0} of triangle {1}.",
+            "Locate the point {0} that is the center of the circumscribed circle of triangle {1}.",
+            "Determine the circumcenter {0} of triangle {1}, which is equidistant from all three vertices."
+        ],
+        "circumradius_t": [
+            "Measure the circumradius {0} of triangle {1}.",
+            "Find the length {0} of the radius of the circumscribed circle of triangle {1}.",
+            "Determine the circumradius {0} of triangle {1}, which is the distance from its circumcenter to any vertex."
+        ],
+        "centroid_t": [
+            "Find the centroid {0} of triangle {1}.",
+            "Locate the point {0} that is the centroid of triangle {1}.",
+            "Determine the point {0} where the three medians of triangle {1} intersect."
+        ],
+        "incircle_t": [
+            "Construct the incircle {0} of triangle {1}.",
+            "Draw the circle {0} that is tangent to all three sides of triangle {1}.",
+            "Create the inscribed circle {0} of triangle {1}."
+        ],
+        "incenter_t": [
+            "Let {0} be the incenter of triangle {1}.",
+            "Locate the point {0} that is the center of the inscribed circle of triangle {1}.",
+            "Determine the incenter {0} of triangle {1}."
+        ],
+        "inradius_t": [
+            "Measure the inradius {0} of triangle {1}.",
+            "Find the length {0} of the radius of the inscribed circle of triangle {1}.",
+            "Determine the inradius {0} of triangle {1}."
+        ],
+        "orthocenter_t": [
+            "Find the orthocenter {0} of triangle {1}.",
+            "Locate the point {0} where the three altitudes of triangle {1} intersect.",
+            "Determine the orthocenter {0} of triangle {1}, the point where its three altitudes meet."
+        ],
 
-        # Arithmetic operations
-        "sum_mm": [
-            "Calculate the sum {0} of measures {1} and {2}.",
-            "Compute {0} as the sum of measures {1} and {2}."
+        # odd duck
+        "circumcircle_p": [
+            "Construct the circumcircle {0} of polygon {1}.",
+            "Draw the circle {0} that passes through all the vertices of polygon {1}.",
+            "Create the circumcircle {0} of polygon {1}."
         ],
-        "sum_ms": [
-            "Calculate the sum {0} of measure {1} and the length of segment {2}.",
-            "Compute {0} as the sum of measure {1} and the length of segment {2}."
-        ],
-        "sum_ss": [
-            "Calculate the sum {0} of the lengths of segments {1} and {2}.",
-            "Compute {0} as the sum of the lengths of segments {1} and {2}."
-        ],
-        "minus_mm": [
-            "Calculate the difference {0} between measures {1} and {2}.",
-            "Compute {0} as the difference between measures {1} and {2}."
-        ],
-        "minus_ms": [
-            "Calculate the difference {0} between measure {1} and the length of segment {2}.",
-            "Compute {0} as the difference between measure {1} and the length of segment {2}."
-        ],
-        "minus_sm": [
-            "Calculate the difference {0} between the length of segment {1} and measure {2}.",
-            "Compute {0} as the difference between the length of segment {1} and measure {2}."
-        ],
-        "minus_ss": [
-            "Calculate the difference {0} between the lengths of segments {1} and {2}.",
-            "Compute {0} as the difference between the lengths of segments {1} and {2}."
-        ],
-        "ratio_mm": [
-            "Calculate the ratio {0} of measure {1} to measure {2}.",
-            "Compute {0} as the ratio of measure {1} to measure {2}."
-        ],
-        "power_mi": [
-            "Calculate the power {0} of measure {1} to the exponent {2}.",
-            "Compute {0} as measure {1} raised to the power of {2}."
-        ],
-        "power_si": [
-            "Calculate the power {0} of the length of segment {1} to the exponent {2}.",
-            "Compute {0} as the length of segment {1} raised to the power of {2}."
-        ],
-
     }
     stats = {
         "num_commands": 0,
@@ -524,6 +535,7 @@ def translate_problem(contents: str) -> Optional[str]:
         "num_segments_constructed": 0,
         "num_triangles_constructed": 0,
         "num_polygons_constructed": 0,
+        "num_midpoints_constructed": 0,
         "num_rotations": 0,
         "num_reflections": 0,
         "num_intersections": 0, 
@@ -566,11 +578,11 @@ def translate_problem(contents: str) -> Optional[str]:
         # gather construction stats here, so it's all in one place
         if "point" in cmd:
             stats["num_raw_points_constructed"] += 1 # including point_at_distance*, not including intersection points
-        if "circle" in cmd:
+        if "circle" in cmd: #including incircle, circumcircle
             stats["num_circles_constructed"] += 1
         if "polygon" in cmd:
             stats["num_polygons_constructed"] += 1
-        if "line" in cmd and "bisector" not in cmd: # this includes orthogonal lines, but not angle_bisector
+        if ("line" in cmd and "bisector" not in cmd) or "polar_pc" in cmd or "tangent_pc" in cmd: # this includes orthogonal lines, but not angle_bisector
             stats["num_lines_constructed"] += 1
         if "segment" in cmd:
             stats["num_segments_constructed"] += 1
@@ -588,7 +600,7 @@ def translate_problem(contents: str) -> Optional[str]:
             stats["num_angle_bisections"] += 1
         if "triangle" in cmd:
             stats["num_triangles_constructed"] += 1
-        if "special_triangle_op" in cmd:
+        if cmd.endswith("_t"):
             stats["num_special_triangle_ops"] += 1
             
             
@@ -606,6 +618,8 @@ def translate_problem(contents: str) -> Optional[str]:
         if cmd == "angle_ppp":
             idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
         if cmd == "circle_ppp":
+            idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
+        if cmd == "triangle_ppp":
             idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
         
         
@@ -629,17 +643,30 @@ def translate_problem(contents: str) -> Optional[str]:
             translated_line = random.choice(polygon_templates)
             result_lines.append(translated_line)
             continue
+
+        if cmd == "polygon_from_center_and_circumradius":
+            polygon_templates = [
+                f"Construct a regular polygon with {inputs[0]} sides, centered at {inputs[1]} with a circumradius of {inputs[2]}. Call the resulting polygon {outputs[0]}.",
+                f"Create a regular {inputs[0]}-sided polygon with center at point {inputs[1]} and circumradius equal to {inputs[2]}. Label this polygon as {outputs[0]}.",
+                f"Draw a regular polygon having {inputs[0]} sides, with its center at {inputs[1]} and distance {inputs[2]} from center to any vertex. Name this polygon {outputs[0]}."
+            ]
+            translated_line = random.choice(polygon_templates)
+            result_lines.append(translated_line)
+            continue
         
         if cmd == "measure":
-            if "polygon" in command_constructed_by[raw_inputs[0]].name:
-                measure_templates = [
-                    f"What is the area of polygon {inputs[0]}?",
-                    f"Find the area of polygon {inputs[0]}."
-                ]
-                translated_line = random.choice(measure_templates)
-                result_lines.append(translated_line)
-                stats["measure_type"] = "area"
-                continue
+            try:
+                if "polygon" in command_constructed_by[raw_inputs[0]].name:
+                    measure_templates = [
+                        f"What is the area of polygon {inputs[0]}?",
+                        f"Find the area of polygon {inputs[0]}."
+                    ]
+                    translated_line = random.choice(measure_templates)
+                    result_lines.append(translated_line)
+                    stats["measure_type"] = "area"
+                    continue
+            except Exception as e:
+                pdb.set_trace()
             if "angle" in command_constructed_by[raw_inputs[0]].name:
                 measure_templates = [
                     f"What is the measure of angle {inputs[0]}, in radians?",

@@ -1,4 +1,4 @@
-import os
+import os, pdb
 from geo_types import *
 
 type_to_shortcut = {
@@ -16,6 +16,7 @@ type_to_shortcut = {
     Angle     : 'a',
     AngleSize : 'A',
     Vector    : 'v',
+    Triangle  : 't',
 }
 
 def command_types_name(name, params):
@@ -73,7 +74,9 @@ class Command:
 
     def apply(self):
         input_data = [x.data for x in self.input_elements]
+
         name = command_types_name(self.name, input_data)
+
         if name not in command_dict: name = self.name
         f = command_dict[name]
         output_data = f(*input_data)

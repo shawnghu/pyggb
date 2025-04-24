@@ -1,1 +1,0 @@
-triangle_median_length_ratio.txt: 0.875

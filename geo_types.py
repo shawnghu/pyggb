@@ -210,6 +210,7 @@ class Angle:
 class Polygon:
     def __init__(self, points):
         self.points = np.array(points, dtype = float)
+        self.center = np.average(self.points, axis = 0)
 
     def translate(self, vec):
         self.points += vec
@@ -229,6 +230,36 @@ class Polygon:
         cr.fill()
         cr.restore()
 
+class Triangle:
+    def __init__(self, a, b, c):
+        self.a = a
+        self.b = b
+        self.c = c
+        
+    def translate(self, vec):
+        self.a += vec
+        self.b += vec
+        self.c += vec
+    def scale(self, ratio):
+        self.a *= ratio
+        self.b *= ratio
+        self.c *= ratio
+    def important_points(self):
+        return [self.a, self.b, self.c]
+    
+    def __repr__(self):
+        return "Triangle(a={}, b={}, c={})".format(self.a, self.b, self.c)
+    
+    def equivalent(self, other):
+        return np.isclose(self.a, other.a).all() and np.isclose(self.b, other.b).all() and np.isclose(self.c, other.c).all()
+    # Completely untested
+    def draw(self, cr, corners):
+        cr.move_to(*self.a)
+        cr.line_to(*self.b)
+        cr.line_to(*self.c)
+        cr.close_path()
+        cr.set_source_rgba(0, 0, 0, 0.1)
+        cr.fill()
 
 class Circle:
     def __init__(self, center, r):
@@ -367,7 +398,7 @@ class Boolean:
 # Define all types that can be meaningfully measured
 MEASURABLE_TYPES = (
     # Numeric types
-    Measure, float, int,
+    Measure, # no good reason to directly measure float/int bcause they only arise when we construct them directly
     # Geometric types with direct numeric value
     AngleSize, Angle, Segment, Polygon
     # Remove Boolean because it makes boring constructions

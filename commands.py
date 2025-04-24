@@ -397,6 +397,7 @@ def mirror_pc(point: gt.Point, by_circle: gt.Circle) -> gt.Point:
     return gt.Point(by_circle.c + v * (by_circle.r_squared / gt.square_norm(v)) )
 
 def mirror_pl(point: gt.Point, by_line: gt.Line) -> gt.Point:
+    assert not np.isclose(np.dot(point.a, by_line.n) - by_line.c, 0), "Point must not be on the line"
     return gt.Point(point.a + by_line.n*2*(by_line.c - np.dot(point.a, by_line.n)))
 
 def mirror_pp(point: gt.Point, by_point: gt.Point) -> gt.Point:
@@ -447,19 +448,7 @@ def polar_pc(point: gt.Point, circle: gt.Circle) -> gt.Line:
     n = point.a - circle.c
     assert(not np.isclose(n, 0).all())
     return gt.Line(n, np.dot(n, circle.c) + circle.r_squared)
-
-def polygon_ppi(p1: gt.Point, p2: gt.Point, n: int) -> List[Union[gt.Polygon, gt.Segment, gt.Point]]:
-    p1c,p2c = (gt.a_to_cpx(p.a) for p in (p1,p2))
-    alpha = 2*np.pi/n
-    center = p2c + (p1c-p2c)/(1-np.exp(-alpha*1j))
-    v = p2c-center
-    points = [gt.Point(gt.cpx_to_a(center + v*np.exp(i*alpha*1j))) for i in range(1,n-1)]
-    raw_points = [p.a for p in [p1,p2]+points]
-    segments = [
-        gt.Segment(p1, p2)
-        for p1,p2 in zip(raw_points, raw_points[1:] + raw_points[:1])
-    ]
-    return [gt.Polygon(raw_points)] + segments + points
+# note: polygon_ppi removed because describing it in natural language was prohibitive.
 
 # note: no polygon command for arbitrary points, since we could not ensure the points would be listed in order
 # triangle and quadrilateral could be defined with explicit casing
@@ -574,3 +563,78 @@ def point_pm(point: gt.Point, distance: int) -> gt.Point:
     """Create a point at a specified distance from an existing point in a random direction."""
     assert(distance > 0)
     return gt.Point(point.a + distance * gt.random_direction())
+
+def circumcircle_p(p: gt.Polygon) -> gt.Circle:
+    return gt.Circle(p.center, np.linalg.norm(p.points[0] - p.center))
+
+
+def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Triangle:
+    return gt.Triangle(p1, p2, p3)
+
+def circumcircle_t(t: gt.Triangle) -> gt.Circle:
+    return circle_ppp(t.a, t.b, t.c)
+
+def circumcenter_t(t: gt.Triangle) -> gt.Point:
+    return centroid_t(t)
+
+def circumradius_t(t: gt.Triangle) -> gt.Measure:
+    return radius_c(circumcircle_t(t))
+
+def centroid_t(t: gt.Triangle) -> gt.Point:
+    median_a = gt.Segment(t.a, midpoint_pp(t.b, t.c))
+    median_b = gt.Segment(t.b, midpoint_pp(t.a, t.c))
+    return intersect_ss(median_a, median_b)
+
+def incircle_t(t: gt.Triangle) -> gt.Circle:
+    """Returns the incircle of a triangle - the circle tangent to all three sides."""
+    # Get the angle bisectors
+    ab1 = angular_bisector_ppp(t.b, t.a, t.c)
+    ab2 = angular_bisector_ppp(t.a, t.b, t.c)
+    
+    # Incenter is the intersection of angle bisectors
+    incenter = intersect_ll(ab1, ab2)
+    
+    # Calculate distance from incenter to any side (all are equal)
+    side_a = line_pp(t.b, t.c)
+    distance = abs(np.dot(incenter.a, side_a.n) - side_a.c)
+    
+    return gt.Circle(incenter.a, distance)
+
+def incenter_t(t: gt.Triangle) -> gt.Point:
+    """Returns the incenter of a triangle - the center of the incircle."""
+    # Get the angle bisectors
+    ab1 = angular_bisector_ppp(t.b, t.a, t.c)
+    ab2 = angular_bisector_ppp(t.a, t.b, t.c)
+    
+    # Incenter is the intersection of angle bisectors
+    return intersect_ll(ab1, ab2)
+
+def inradius_t(t: gt.Triangle) -> gt.Measure:
+    """Returns the inradius of a triangle - the radius of the incircle."""
+    return radius_c(incircle_t(t))
+
+def orthocenter_t(t: gt.Triangle) -> gt.Point:
+    """Returns the orthocenter of a triangle - the intersection of the three altitudes."""
+    # Create the altitudes (perpendicular lines from vertices to opposite sides)
+    alt1 = orthogonal_line_pl(t.a, line_pp(t.b, t.c))
+    alt2 = orthogonal_line_pl(t.b, line_pp(t.a, t.c))
+    
+    # Orthocenter is the intersection of the altitudes
+    return intersect_ll(alt1, alt2)
+
+def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radius: Union[gt.Measure, float]) -> gt.Polygon:
+    """Create a regular polygon with specified number of sides, center, and circumradius."""
+    # Extract radius value from Measure object if needed
+    r = radius.x if isinstance(radius, gt.Measure) else float(radius)
+    
+    # Generate evenly spaced points around the circle
+    points = []
+    for i in range(num_sides):
+        angle = 2 * np.pi * i / num_sides
+        # Using polar coordinates to place points evenly
+        x = center.a[0] + r * np.cos(angle)
+        y = center.a[1] + r * np.sin(angle)
+        points.append(np.array([x, y]))
+    
+    return gt.Polygon(points)
+

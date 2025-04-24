@@ -1,2 +1,0 @@
-equilateral_triangle_side.txt: 5.0
-equilateral_triangle_height.txt: 5.1962

@@ -1,8 +1,0 @@
-# Semicircle diameter length
-point :  -> A
-const int 4 -> side_length
-point_pm : A side_length -> B
-semicircle : A B -> semi
-segment_pp : A B -> diameter
-distance_pp : A B -> diameter_length
-measure : diameter_length -> result
