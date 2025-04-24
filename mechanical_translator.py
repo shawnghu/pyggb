@@ -545,15 +545,17 @@ def translate_problem(contents: str) -> Optional[str]:
         inputs = [idents[arg] if arg in idents else arg for arg in raw_inputs]
         
         if cmd == "segment_pp":
-            idents[outputs[0]] = "segment " + inputs[0] + inputs[1]
+            idents[outputs[0]] = inputs[0] + inputs[1]
         if cmd == "angle_ppp":
-            idents[outputs[0]] = "angle " + inputs[0] + inputs[1] + inputs[2]
+            idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
         if cmd == "circle_ppp":
-            idents[outputs[0]] = "circle " + inputs[0] + inputs[1] + inputs[2]
+            idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
         
         
         if cmd == "polygon_ppi":
             num_sides = int(inputs[-1])
+            if num_sides <= 3:
+                return None
             polygon_name = outputs[0]
             polygon_segment_idents = outputs[1:1+num_sides]
             polygon_vertex_idents = inputs[0:2] + outputs[1+num_sides:]
@@ -581,16 +583,16 @@ def translate_problem(contents: str) -> Optional[str]:
                 continue
             if "angle" in command_constructed_by[raw_inputs[0]]:
                 measure_templates = [
-                    f"What is the measure of {inputs[0]}?",
-                    f"Find the measure of {inputs[0]}."
+                    f"What is the measure of angle {inputs[0]}, in radians?",
+                    f"Find the measure of angle {inputs[0]}, in radians."
                 ]
                 translated_line = random.choice(measure_templates)
                 result_lines.append(translated_line)
                 continue
             if "segment" in command_constructed_by[raw_inputs[0]]:
                 measure_templates = [
-                    f"What is the length of {inputs[0]}?",
-                    f"Find the length of {inputs[0]}."
+                    f"What is the length of segment {inputs[0]}?",
+                    f"Find the length of segment {inputs[0]}."
                 ]
                 translated_line = random.choice(measure_templates)
                 result_lines.append(translated_line)

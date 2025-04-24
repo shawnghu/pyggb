@@ -1,4 +1,14 @@
 mechanical translator:
+
+- now there are a couple of errors:
+[x] polygons can be made with less than 3 sides i think
+[x] some repetition of the word "segment", maybe "angle".
+- angles should be specified to be measured in radians.
+
+- also, reassign the idents, 'cause the existing problems are ass
+
+- more generally, sample problems with o4 with a normal validation setup, and see what the extant problems are
+
 [x] create first draft (thankfully this was easy because i factored translate_to_nl really well in the first place)
 - finish generating the basic dataset
 	[x] prereq to everything: the classical generator problem

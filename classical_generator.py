@@ -245,6 +245,7 @@ class ClassicalGenerator:
     def _sample_commands(self) -> Generator[str, None, None]:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
+        command_names.append('polygon_ppi') # double the probability of polygon construction
         random.shuffle(command_names)
         
         for cmd_name in command_names:
@@ -316,6 +317,12 @@ class ClassicalGenerator:
                 used_elements.add(selected)  # Mark as used
             
             if valid_params:
+                if cmd_name == 'polygon_ppi':
+                    try: 
+                        if input_elements[2].data <= 3: # 3 or fewer sides not valid. triangles constructed separately.
+                            continue
+                    except:
+                        print("ya messed up passing the right arg in")
                 # Try to execute the command
                 success, command = self._try_apply_command(cmd_name, input_elements)
                 if success:
