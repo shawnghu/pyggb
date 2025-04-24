@@ -1,5 +1,6 @@
 import numpy as np
 import geo_types as gt
+import random
 from typing import List, Tuple, Union, Optional, Any
 
 def angle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Angle:
@@ -560,7 +561,14 @@ def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, dista
     # Project reference point onto the line
     closest_pt = line.c * line.n - np.dot(reference_point.a, line.n) * line.n + reference_point.a
     # Move along line direction by the specified distance
-    return gt.Point(closest_pt + line.v * distance)
+    # Note that because the command doesn't naturally specify which direction,
+    # we actually don't want the outcome to be deterministic, or else the problem statement
+    # will not match the construction's logic.
+    if random.random() < 0.5:
+        return gt.Point(closest_pt + line.v * distance)
+    else:
+        return gt.Point(closest_pt - line.v * distance)
+
 
 def point_pm(point: gt.Point, distance: int) -> gt.Point:
     """Create a point at a specified distance from an existing point in a random direction."""

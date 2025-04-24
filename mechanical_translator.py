@@ -10,9 +10,16 @@ import json
 import concurrent.futures
 import threading
 import random  # Add this import for random selection
+from dataclasses import dataclass
 global_timestamp = str(int(time.time()))
 # Add a file lock for thread-safe writing
 file_lock = threading.Lock()
+
+@dataclass
+class Command:
+    name: str
+    inputs: tuple[str]
+    output: Optional[str] = None
 
 def translate_problem(contents: str) -> Optional[str]:
     """
@@ -507,7 +514,23 @@ def translate_problem(contents: str) -> Optional[str]:
         ],
 
     }
-    
+    stats = {
+        "num_commands": 0,
+        "measure_type": "other",
+        "num_raw_points_constructed": 0,
+        "num_lines_constructed": 0,
+        "num_circles_constructed": 0,
+        "num_angles_constructed": 0,
+        "num_segments_constructed": 0,
+        "num_triangles_constructed": 0,
+        "num_polygons_constructed": 0,
+        "num_rotations": 0,
+        "num_reflections": 0,
+        "num_intersections": 0, 
+        "num_angle_bisections": 0,
+        "num_special_triangle_ops": 0,
+    }
+    num_commands = 0
     # Initialize the result list
     result_lines = []
     command_constructed_by = {}
@@ -524,6 +547,8 @@ def translate_problem(contents: str) -> Optional[str]:
             output = line.strip().split(' ')[-1]
             value = line.strip().split(' ')[2]
             idents[output] = value
+        
+        num_commands += 1
 
         # Split the line into command and arguments
         parts = line.split(':')
@@ -537,13 +562,45 @@ def translate_problem(contents: str) -> Optional[str]:
         args_parts = parts[1].split('->')
         if len(args_parts) < 2:
             continue
+        
+        # gather construction stats here, so it's all in one place
+        if "point" in cmd:
+            stats["num_raw_points_constructed"] += 1 # including point_at_distance*, not including intersection points
+        if "circle" in cmd:
+            stats["num_circles_constructed"] += 1
+        if "polygon" in cmd:
+            stats["num_polygons_constructed"] += 1
+        if "line" in cmd and "bisector" not in cmd: # this includes orthogonal lines, but not angle_bisector
+            stats["num_lines_constructed"] += 1
+        if "segment" in cmd:
+            stats["num_segments_constructed"] += 1
+        if "angle" in cmd:
+            stats["num_angles_constructed"] += 1
+        if "intersect" in cmd:
+            stats["num_intersections"] += 1
+        if "mirror" in cmd:
+            stats["num_reflections"] += 1
+        if "midpoint" in cmd or "line_bisector" in cmd:
+            stats["num_midpoints_constructed"] += 1
+        if "rotate" in cmd:
+            stats["num_rotations"] += 1
+        if "angular_bisector" in cmd:
+            stats["num_angle_bisections"] += 1
+        if "triangle" in cmd:
+            stats["num_triangles_constructed"] += 1
+        if "special_triangle_op" in cmd:
+            stats["num_special_triangle_ops"] += 1
             
+            
+            
+
         raw_inputs = [arg.strip() for arg in args_parts[0].split() if arg.strip()]
         outputs = [arg.strip() for arg in args_parts[1].split() if arg.strip()]
-        for output in outputs:
-            command_constructed_by[output] = cmd
         inputs = [idents[arg] if arg in idents else arg for arg in raw_inputs]
+        for output in outputs:
+            command_constructed_by[output] = Command(cmd, inputs)
         
+
         if cmd == "segment_pp":
             idents[outputs[0]] = inputs[0] + inputs[1]
         if cmd == "angle_ppp":
@@ -555,7 +612,7 @@ def translate_problem(contents: str) -> Optional[str]:
         if cmd == "polygon_ppi":
             num_sides = int(inputs[-1])
             if num_sides <= 3:
-                return None
+                return None, None
             polygon_name = outputs[0]
             polygon_segment_idents = outputs[1:1+num_sides]
             polygon_vertex_idents = inputs[0:2] + outputs[1+num_sides:]
@@ -574,37 +631,75 @@ def translate_problem(contents: str) -> Optional[str]:
             continue
         
         if cmd == "measure":
-            if "polygon" in command_constructed_by[raw_inputs[0]]:
+            if "polygon" in command_constructed_by[raw_inputs[0]].name:
                 measure_templates = [
                     f"What is the area of polygon {inputs[0]}?",
                     f"Find the area of polygon {inputs[0]}."
                 ]
                 translated_line = random.choice(measure_templates)
                 result_lines.append(translated_line)
+                stats["measure_type"] = "area"
                 continue
-            if "angle" in command_constructed_by[raw_inputs[0]]:
+            if "angle" in command_constructed_by[raw_inputs[0]].name:
                 measure_templates = [
                     f"What is the measure of angle {inputs[0]}, in radians?",
                     f"Find the measure of angle {inputs[0]}, in radians."
                 ]
                 translated_line = random.choice(measure_templates)
                 result_lines.append(translated_line)
+                stats["measure_type"] = "angle"
                 continue
-            if "segment" in command_constructed_by[raw_inputs[0]]:
+            if "segment" in command_constructed_by[raw_inputs[0]].name:
                 measure_templates = [
                     f"What is the length of segment {inputs[0]}?",
                     f"Find the length of segment {inputs[0]}."
                 ]
                 translated_line = random.choice(measure_templates)
                 result_lines.append(translated_line)
+                stats["measure_type"] = "segment_length"
                 continue
-                
+            # in the following cases, we are actually measuring a Measure that was constructed by the previous command
+            if "distance_pp" in command_constructed_by[raw_inputs[0]].name:
+                result_lines.pop()
+                last_line_inputs = command_constructed_by[raw_inputs[0]].inputs
+                measure_templates = [
+                    f"What is the distance between points {last_line_inputs[0]} and {last_line_inputs[1]}?",
+                    f"Find the distance between points {last_line_inputs[0]} and {last_line_inputs[1]}."
+                ]
+                translated_line = random.choice(measure_templates)
+                result_lines.append(translated_line)
+                stats["measure_type"] = "two_points_distance"
+                continue
+            if "radius_c" in command_constructed_by[raw_inputs[0]].name:
+                result_lines.pop()
+                last_line_inputs = command_constructed_by[raw_inputs[0]].inputs
+                measure_templates = [
+                    f"What is the radius of circle {last_line_inputs[0]}?",
+                    f"Find the radius of circle {last_line_inputs[0]}."
+                ]
+                translated_line = random.choice(measure_templates)
+                result_lines.append(translated_line)
+                stats["measure_type"] = "circle_radius"
+                continue
+            if "area_P" in command_constructed_by[raw_inputs[0]].name:
+                result_lines.pop()
+                last_line_inputs = command_constructed_by[raw_inputs[0]].inputs
+                measure_templates = [
+                    f"What is the area of polygon {last_line_inputs[0]}?",
+                    f"Find the area of polygon {last_line_inputs[0]}."
+                ]
+                translated_line = random.choice(measure_templates)
+                result_lines.append(translated_line)
+                stats["measure_type"] = "area"
+                continue
+
             measure_templates = [
                 f"Compute the value of {inputs[0]}.",
                 f"Calculate the value of {inputs[0]}."
             ]
             translated_line = random.choice(measure_templates)
             result_lines.append(translated_line)
+            stats["measure_type"] = "other"
             continue
             
         # Get the template for this command
@@ -656,21 +751,19 @@ def translate_problem(contents: str) -> Optional[str]:
     
     # Combine all translated lines into a coherent problem statement
     if not result_lines:
-        return None
+        return None, None
         
     final_result = " ".join(result_lines)
-    
-    # Add a conclusion based on the last line (which should be a measurement)
-    # This assumes the last line is a "measure" command
-    return final_result
+    stats["num_commands"] = num_commands
+    return final_result, stats
 
 def process_file_contents(filename: str, contents: str, answer: str, output_dir: Path, hash: str) -> None:
-    problem = translate_problem(contents)
+    problem, stats = translate_problem(contents)
     if problem is None:
         return
     with file_lock:  # Use a lock to ensure thread-safe file writing
         with open(os.path.join(output_dir, f"{global_timestamp}_mechanically_translated.jsonl"), 'a') as f:
-            f.write(json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename}) + "\n")
+            f.write(json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename, "stats": stats}) + "\n")
 
 
 def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}, max_workers: int = 4) -> None:
