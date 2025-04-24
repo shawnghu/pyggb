@@ -19,7 +19,8 @@ def main():
     parser.add_argument("--model_shortname", type=str, default="qwen")
     parser.add_argument("--grade_all_problems", action="store_true")
     parser.add_argument("--num_trials", type=int, default=10)
-    parser.add_argument("--tensor_parallel_size", type=int, default=4)
+    parser.add_argument("--tensor_parallel_size", type=int, default=1)
+    parser.add_argument("--pipeline_parallel_size", type=int, default=1)
     args = parser.parse_args()
 
     if args.model_shortname == "qwen":
@@ -44,6 +45,7 @@ def main():
     llm = LLM(
         model=model_name,
         tensor_parallel_size=args.tensor_parallel_size,
+        pipeline_parallel_size=args.pipeline_parallel_size,
         trust_remote_code=True,
         dtype="float16"
     )
@@ -94,7 +96,10 @@ def main():
                 verbose_output[f"extracted_answer_{trial_idx}"] = extracted_answer
                 correct = False
                 if extracted_answer is not None:
-                    correct = isclose(float(extracted_answer), float(line["original_answer"]))
+                    try:
+                        correct = isclose(float(extracted_answer), float(line["answer"]))
+                    except KeyError:
+                        correct = isclose(float(extracted_answer), float(line["original_answer"]))
                 if correct:
                     num_correct += 1
                     verbose_output[f"correct_{trial_idx}"] = True

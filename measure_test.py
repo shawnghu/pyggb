@@ -184,9 +184,8 @@ def main():
     args = parser.parse_args()
     
     if os.path.isdir(args.path):
-        print(f"Processing directory: {args.path}")
-        # Add timestamp subdirectory to passed_dir
         timestamp = str(int(time.time()))
+        print(f"Output timestamp: {timestamp}")
         passed_dir = os.path.join("passed/", timestamp)
         os.makedirs(passed_dir, exist_ok=True)
         results = process_directory(args.path, passed_dir=passed_dir, num_tests=args.num_tests, verbose=args.verbose)
