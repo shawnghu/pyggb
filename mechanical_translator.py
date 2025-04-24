@@ -623,8 +623,8 @@ def translate_problem(contents: str) -> Optional[str]:
             # Provide two alternative phrasings for polygon construction
             polygon_templates = [
                 f"Construct a regular polygon with {num_sides} sides starting from points {inputs[0]} and {inputs[1]}. Call the new vertices, in counterclockwise order after {inputs[1]}, {polygon_vertex_idents[2:]}, and label the resulting polygon as {polygon_name}.",
-                f"Create a regular {num_sides}-sided polygon beginning at points {inputs[0]} and {inputs[1]}. Name the additional vertices, in counterclockwise order after {inputs[1]}, {polygon_vertex_idents[2:]}, and denote the polygon as {polygon_name}."
-                f"Create a regular {num_sides}-sided polygon where the vertices in counterclockwise order are {inputs[0]}, {inputs[1]} and the {num_sides - 2} new vertices {polygon_vertex_idents[2:]}; denote the polygon itself {polygon_name}."
+                f"Create a regular {num_sides}-sided polygon beginning at points {inputs[0]} and {inputs[1]}. Name the additional vertices, in counterclockwise order after {inputs[1]}, {polygon_vertex_idents[2:]}, and denote the polygon as {polygon_name}.",
+                f"Create a regular {num_sides}-sided polygon where the vertices in counterclockwise order are {inputs[0]}, {inputs[1]} and the {num_sides - 2} new vertices {polygon_vertex_idents[2:]}; denote the polygon itself {polygon_name}.",
             ]
             translated_line = random.choice(polygon_templates)
             result_lines.append(translated_line)
