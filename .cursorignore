@@ -1,0 +1,9 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+natural_language_problems/
+generated_constructions/
+passed/
+failed/
+ggb-benchmark/false
+costs/
+.venv
+.gitignore
