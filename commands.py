@@ -569,7 +569,7 @@ def circumcircle_p(p: gt.Polygon) -> gt.Circle:
 
 
 def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Triangle:
-    return gt.Triangle(p1, p2, p3)
+    return [p1, p2, p3, gt.Triangle(p1, p2, p3)]
 
 def circumcircle_t(t: gt.Triangle) -> gt.Circle:
     return circle_ppp(t.a, t.b, t.c)
@@ -636,5 +636,32 @@ def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radiu
         y = center.a[1] + r * np.sin(angle)
         points.append(np.array([x, y]))
     
+    return points + [gt.Polygon(points)]
+
+"""
+Suppose H is a 6-gon in the plane with vertices labeled ABCDEF in clockwise order, oriented such that AB is on the bottom side parallel to the x-axis. H is rotated about its center counterclockwise by an angle M. Afterwards, the chord DF has a slope of 0. What is the measure of angle M?
+or for a more complicated problem you could imagine some intermediate constructing steps, like
+H is rotated about its center counterclockwise by an angle M. Afterwards, the chord DF and the chord AE are drawn, and the point G is constructed at their intersection. G has distance N from the initial position of vertex A. What is the measure of angle M?
+"""
+
+def rotate_polygon_about_center(polygon: gt.Polygon, angle: gt.Angle) -> gt.Polygon:
+    points = []
+    for i in range(len(polygon.points)):  
+        points.append(rotate_pAp(polygon.points[i], angle, polygon.center))
     return gt.Polygon(points)
 
+def random_chord_c(circle: gt.Circle) -> gt.Segment:
+    p1 = point_c(circle)
+    p2 = point_c(circle)
+    while np.isclose(p1.a, p2.a).all():
+        p2 = point_c(circle)
+    return gt.Segment(p1, p2)
+
+def random_diagonal_p(polygon: gt.Polygon) -> gt.Segment:
+    """Returns a random diagonal of a polygon (a segment connecting two non-adjacent vertices)."""
+    n = len(polygon.points)
+    while True:
+        i, j = random.sample(range(n), 2)
+        if abs(i - j) % n != 1 and abs(i - j) % n != n - 1: 
+            return gt.Segment(polygon.points[i], polygon.points[j])
+        

@@ -615,13 +615,13 @@ def translate_problem(contents: str) -> Optional[str]:
 
         if cmd == "segment_pp":
             idents[outputs[0]] = inputs[0] + inputs[1]
+            continue
         if cmd == "angle_ppp":
             idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
-        if cmd == "circle_ppp":
-            idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
+            continue
         if cmd == "triangle_ppp":
             idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
-        
+            continue
         
         if cmd == "polygon_ppi":
             num_sides = int(inputs[-1])

@@ -2,6 +2,7 @@ import os
 import sys
 import traceback
 import numpy as np
+np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import shutil
 import time
 import argparse

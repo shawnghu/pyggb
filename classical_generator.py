@@ -1,3 +1,4 @@
+import functools
 import numpy as np
 np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import random
@@ -5,7 +6,7 @@ import inspect
 import sys
 import os
 import argparse
-from typing import Dict, List, Set, Tuple, Any, Union, Optional, Generator
+from typing import Dict, List, Set, Tuple, Any, Union, Optional, Generator, Callable
 import pdb
 
 # Import the commands module
@@ -119,16 +120,11 @@ class ClassicalGenerator:
             random.seed(seed)
             np.random.seed(seed)
         
-        # Initialize a pool of identifiers to use
-        # bonus: rework this just so that polygons are labeled with conseuctive letters 
-        self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
-        random.shuffle(self.identifier_pool)
-        extras = [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
-        random.shuffle(extras)
-        self.identifier_pool += extras
+        self.init_identifier_pool()
         
         # Keep track of used identifiers and their types
         self.identifiers: Dict[str, Element] = {}
+        self.identifier_queue: List[str] = []
         
         # Get all available commands from the commands module
         self.available_commands = self._get_commands()
@@ -139,6 +135,10 @@ class ClassicalGenerator:
         self.made_polygon_already: bool = False
         self.made_triangle_already: bool = False
 
+    def init_identifier_pool(self):
+        self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
+        self.secondary_identifier_pool = [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
+        
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
         commands_dict = {}
@@ -168,12 +168,22 @@ class ClassicalGenerator:
             }
         return commands_dict
 
-    def _get_unused_identifier(self) -> str:
+    def _get_unused_identifier(self, return_sequential: int ) -> str:
         """Get an unused identifier from the pool."""
-        for identifier in self.identifier_pool:
-            if identifier not in self.identifiers:
-                return identifier
-        raise ValueError("Ran out of identifiers!")
+        id_pool = self.identifier_pool if self.identifier_pool and len(self.identifier_pool) > return_sequential else self.secondary_identifier_pool
+        if return_sequential > 0 and len(id_pool) > return_sequential:
+            identifier = id_pool.pop(0) # the next time we call this function, we will, by construction, get the next index
+        else:
+            idx = random.randrange(len(id_pool))
+            identifier = id_pool.pop(idx)
+        return identifier
+
+    def _assign_specific_identifiers(self) -> str:
+        if self.identifier_queue:
+            return self.identifier_queue.pop(0)
+        else:
+            print("This wasn't supposed to happen. Ran out of identifiers to assign intentionally.")
+            return self._get_unused_identifier(return_sequential=0)
 
     def _is_compatible_type(self, value_type, required_type) -> bool:
         return value_type == required_type or required_type == Any
@@ -217,7 +227,7 @@ class ClassicalGenerator:
         
         return compatible
     
-    def _try_apply_command(self, cmd_name: str, input_elements: List[Element]) -> Tuple[bool, List[Element], Command]:
+    def _try_apply_command(self, cmd_name: str, input_elements: List[Element], label_factory: Callable[[], str] = self._get_unused_identifier) -> Tuple[bool, List[Element], Command]:
         """
         Try to execute a command and return its result.
         
@@ -232,7 +242,7 @@ class ClassicalGenerator:
             - command: The Command object that was executed
         """
         try:
-            command = Command(cmd_name, input_elements, label_factory=self._get_unused_identifier, label_dict=self.identifiers)
+            command = Command(cmd_name, input_elements, label_factory=label_factory, label_dict=self.identifiers)
             command.apply()
             return True, command
         except Exception as e:
@@ -338,10 +348,20 @@ class ClassicalGenerator:
                 input_elements.append(selected)
                 used_elements.add(selected)  # Mark as used
             if valid_params:
-                if cmd_name == 'polygon_from_center_and_circumradius':
-                    input_elements[0].data = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
+                
+                if cmd_name == 'rotate_polygon_about_center':
+                    # e.g, map polygon ABCDEF to A'B'C'D'E'F'
+                    self.identifier_queue = [x.label + "'" for x in input_elements[0].data.points]
+                    label_factory = self._assign_specific_identifiers
+                elif cmd_name == 'polygon_from_center_and_circumradius':
+                    num_sides = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
+                    input_elements[0].data = num_sides
+                    # assign sequential identifiers to the vertices of the polygon
+                    label_factory = functools.partial(self._get_unused_identifier, return_sequential=num_sides)
+                else:
+                    label_factory = self._get_unused_identifier
                 # Try to execute the command
-                success, command = self._try_apply_command(cmd_name, input_elements)
+                success, command = self._try_apply_command(cmd_name, input_elements, label_factory)
                 if success:
                     return input_elements, command
                 else:
@@ -483,6 +503,7 @@ class ClassicalGenerator:
         # and the element object will be updated, passed around, and have the correct label when it is used as an input element.
         # in fact, trying to rename the input element will fail, because it has already been renamed.
         ident_idx = 0
+        self.init_identifier_pool() # this effectively destroys all ability to assign idents later, so we have to be sure that this is one of the last things we ever do with this generator.
         # mapping = {}
         for command in ordered_commands:
             if isinstance(command, ConstCommand):
@@ -510,8 +531,6 @@ class ClassicalGenerator:
         # effectively the retval
         self.pruned_command_sequence = ordered_commands
         return True
-
-        
 
 
     def save_construction(self, filename: str, description: str = "Generated construction"):

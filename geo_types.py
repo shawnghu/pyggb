@@ -206,7 +206,7 @@ class Angle:
         cr.set_line_width(1)
         cr.stroke()
 
-
+# implicitly a regular polygon now, not in original pyggb though
 class Polygon:
     def __init__(self, points):
         self.points = np.array(points, dtype = float)
