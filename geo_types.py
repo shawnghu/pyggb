@@ -1,3 +1,4 @@
+from typing import List, Union
 import cairo
 import numpy as np
 
@@ -102,8 +103,12 @@ class Line:
         return np.isclose(np.dot(x,self.n), self.c)
 
 class Segment(Line):
-    def __init__(self, p1, p2): # [x,y] in Line([a,b],c) <=> xa + yb == c
-        assert((p1 != p2).any())
+    def __init__(self, p1: Union[Point, np.ndarray], p2: Union[Point, np.ndarray]): # [x,y] in Line([a,b],c) <=> xa + yb == c
+        if isinstance(p1, Point):
+            p1 = p1.a
+        if isinstance(p2, Point):
+            p2 = p2.a
+        assert(not np.isclose(p1, p2).all())
         normal_vec = vector_perp_rot(p1-p2)
         c = np.dot(p1, normal_vec)
         Line.__init__(self, normal_vec, c)
@@ -208,9 +213,9 @@ class Angle:
 
 # implicitly a regular polygon now, not in original pyggb though
 class Polygon:
-    def __init__(self, points):
-        self.points = np.array(points, dtype = float)
-        self.center = np.average(self.points, axis = 0)
+    def __init__(self, points: List[Point]):
+        self.points = points
+        self.center = Point(np.average(np.array([p.a for p in self.points]), axis = 0))
 
     def translate(self, vec):
         self.points += vec
@@ -231,11 +236,14 @@ class Polygon:
         cr.restore()
 
 class Triangle:
-    def __init__(self, a, b, c):
+    def __init__(self, a: Point, b: Point, c: Point):
         self.a = a
         self.b = b
         self.c = c
-        
+        assert(not np.isclose(self.a.a, self.b.a).all())
+        assert(not np.isclose(self.b.a, self.c.a).all())
+        assert(not np.isclose(self.c.a, self.a.a).all())
+
     def translate(self, vec):
         self.a += vec
         self.b += vec
@@ -262,9 +270,12 @@ class Triangle:
         cr.fill()
 
 class Circle:
-    def __init__(self, center, r):
-        assert(r > 0)
-        self.c = np.array(center)
+    def __init__(self, center: Union[Point, np.ndarray], r: float):
+        assert(r > 1e-3)
+        if isinstance(center, Point):
+            self.c = center.a
+        else:
+            self.c = center
         self.r = r
         self.r_squared = self.r**2
 
@@ -321,7 +332,7 @@ class Vector:
     def __init__(self, end_points):
         self.end_points = np.array(end_points)
         self.v = self.end_points[1] - self.end_points[0]
-
+        assert(not np.isclose(self.v, np.zeros(2)).all())
     def translate(self, vec):
         self.end_points += vec
     def scale(self, ratio):
@@ -368,7 +379,7 @@ class AngleSize:
     def __init__(self, x):
         self.x = x
     def __repr__(self):
-        return "AngleSize({}°)".format(self.x/np.pi * 180)
+        return "AngleSize({}°, radians={})".format(self.x/np.pi * 180, self.x)
 
     def translate(self, vec):
         pass
@@ -398,9 +409,9 @@ class Boolean:
 # Define all types that can be meaningfully measured
 MEASURABLE_TYPES = (
     # Numeric types
-    Measure, # no good reason to directly measure float/int bcause they only arise when we construct them directly
+    Measure, # no good reason to directly measure float/int/anglesize bcause they only arise when we construct them directly
     # Geometric types with direct numeric value
-    AngleSize, Angle, Segment, Polygon
+    Angle, Segment, Polygon
     # Remove Boolean because it makes boring constructions
     # Boolean
 )

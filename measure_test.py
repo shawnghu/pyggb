@@ -1,6 +1,8 @@
 import os
+import pdb
 import sys
 import traceback
+from typing import Optional
 import numpy as np
 np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import shutil
@@ -8,8 +10,8 @@ import time
 import argparse
 from collections import Counter
 from random_constr import Construction
-
-def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True):
+import concurrent.futures
+def test_measure_construction(file_path, num_tests=20, precision=4, verbosity=0):
     """
     Test a geometric construction that ends with a measure statement.
     
@@ -26,19 +28,20 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
     try:
         construction.load(file_path)
     except Exception as e:
-        if verbose:
+        if verbosity >= 1:
             print(f"Error loading {file_path}: {str(e)}")
             traceback.print_exc()
         return None
     
     if construction.statement_type != "measure":
-        if verbose:
+        if verbosity >= 1:
             print(f"Construction in {file_path} does not end with a measure statement")
         return None
     
     measurements = []
     failures = 0
     
+    already_printed = False
     for i in range(num_tests):
         try:
             construction.run_commands()
@@ -49,17 +52,16 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
                 print(construction.to_measure)
                 continue
             measurements.append(value)
-            if verbose:
+            if verbosity >= 3:
                 print(f"Test {i+1}: {value}")
         except Exception as e:
             failures += 1
-            if verbose:
+            if verbosity >= 2 and not already_printed:
+                already_printed = True
                 print(f"Test {i+1} failed: {str(e)}")
                 traceback.print_exc()
     
     if not measurements:
-        if verbose:
-            print("All tests failed!")
         return None
     
     # Round measurements to specified precision for analysis
@@ -92,7 +94,7 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
         "pass": mode_count >= 18 and len(measurements) >= 18 and abs(mode) > 0.0001
     }
     
-    if verbose:
+    if verbosity >= 3:
         print(f"\nResults Summary:")
         print(f"Tests: {len(measurements)} successful, {failures} failed")
         print(f"Average: {avg}")
@@ -101,104 +103,120 @@ def test_measure_construction(file_path, num_tests=20, precision=4, verbose=True
         print(f"Max: {max_val}")
         print(f"Most common value: {mode} (occurs {mode_count} times out of {len(measurements)})")
         print(f"PASS: {results['pass']}")
-    
     return results
 
-def process_directory(directory_path, passed_dir="passed", failed_dir="failed", num_tests=20, precision=4, verbose=False):
-    """
-    Process all .txt files in a directory and sort them into pass/fail directories.
+def process_file(directory_path, filename, passed_dir="passed", failed_dir="failed", num_tests=20, verbosity=False, move_files=True) -> tuple[Optional[str], Optional[float]]:
+    file_path = os.path.join(directory_path, filename)
+    if verbosity: 
+        print(f"Testing {filename}...")
     
-    Args:
-        directory_path: Path to directory containing construction files
-        passed_dir: Directory to move passing files to
-        failed_dir: Directory to move failing files to
-        num_tests: Number of tests to run for each file
-        precision: Number of decimal places to round measurements to
-        verbose: Whether to print detailed output for each test
-    
-    Returns:
-        Dictionary with results for each file
-    """
-    # Create output directories if they don't exist
-    os.makedirs(passed_dir, exist_ok=True)
-    os.makedirs(failed_dir, exist_ok=True)
-    
-    results = {}
-    passed_results = {}  # Store results of passing files for answers.txt
-    
-    # Process each .txt file in the directory
-    for filename in os.listdir(directory_path):
-        if not filename.endswith('.txt'):
-            continue
-            
-        file_path = os.path.join(directory_path, filename)
-        if verbose: 
-            print(f"Testing {filename}...")
-        
-        # Test the construction
-        test_results = test_measure_construction(file_path, num_tests, precision, verbose)
-        if test_results is not None:
-            pass
-            # print(test_results["failed_tests"])
-            # print(test_results["all_values"])
+    # Test the construction
+    test_results = test_measure_construction(file_path, num_tests, verbosity=verbosity)
 
-        if test_results is None:
-            if verbose: 
-                print(f"  Failed to test {filename}")
-            results[filename] = {"status": "error", "passed": False}
-            # Move to failed directory
+    if test_results is None:
+        if verbosity >= 1: 
+            print(f"Failed to test {filename}")
+        if move_files:
             shutil.move(file_path, os.path.join(failed_dir, filename))
-            continue
-        
-        # Determine if file passed or failed
-        passed = test_results["pass"]
-        results[filename] = {"status": "pass" if passed else "fail", "results": test_results}
-        
-        # If passed, store the most common value for answers.txt
-        if passed:
-            passed_results[filename] = test_results["mode"]
-        
-        # Move file to appropriate directory
-        destination = os.path.join(passed_dir if passed else failed_dir, filename)
+        return "error", None
+    
+    passed = test_results["pass"]
+    
+    # Move file to appropriate directory
+    destination = os.path.join(passed_dir if passed else failed_dir, filename)
+    if move_files:
         shutil.move(file_path, destination)
-        
-        if verbose: 
-            print(f"  {'PASSED' if passed else 'FAILED'}: {test_results['mode_count']} of {test_results['successful_tests']} tests gave the same result")
     
-    # Create answers.txt in the passed directory with the values from passed files
-    if passed_results:
-        answers_path = os.path.join(passed_dir, "answers.txt")
-        with open(answers_path, 'a') as f:
-            for filename, value in passed_results.items():
-                f.write(f"{filename}: {value}\n")
-        if verbose: 
-            print(f"Created answers.txt in {passed_dir} with {len(passed_results)} entries")
+    if verbosity >= 1: 
+        print(f"{'PASSED' if passed else 'FAILED'}: {test_results['mode_count']} of {test_results['successful_tests']} tests gave the same result")
     
-    return results
+    if passed:
+        return "pass", test_results["mode"]
+    else:
+        return "fail", None
 
 
 def main():
     parser = argparse.ArgumentParser(description="Test geometric constructions")
     parser.add_argument("path", help="Path to construction file or directory")
-    parser.add_argument("--verbose", action="store_true", help="Print verbose output")
+    parser.add_argument("--verbosity", type=int, default=0, help="Print verbose output")
     parser.add_argument("--num_tests", type=int, default=20, help="Number of tests to run")
+    parser.add_argument("--nomovefiles", action="store_false", dest="move_files", help="Don't move files to passed/ or failed/")
+    parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of processes to use")
+    parser.add_argument("--sequential", action="store_true", help="Run tests sequentially")
     args = parser.parse_args()
     
     if os.path.isdir(args.path):
         timestamp = str(int(time.time()))
         print(f"Output timestamp: {timestamp}")
         passed_dir = os.path.join("passed/", timestamp)
-        os.makedirs(passed_dir, exist_ok=True)
-        results = process_directory(args.path, passed_dir=passed_dir, num_tests=args.num_tests, verbose=args.verbose)
+        failed_dir = os.path.join("failed/", timestamp)
+
+        if args.move_files:
+            os.makedirs(passed_dir, exist_ok=True)
+            os.makedirs(failed_dir, exist_ok=True)
+            
         
-        # Print summary
-        passed = sum(1 for r in results.values() if r.get("status") == "pass")
-        failed = sum(1 for r in results.values() if r.get("status") == "fail")
-        errors = sum(1 for r in results.values() if r.get("status") == "error")
+        all_answers = []
         
-        print(f"\nSummary: {passed} passed, {failed} failed, {errors} errors")
+        num_passed = 0
+        num_failed = 0
+        num_errors = 0
+        if args.sequential:
+            # Run sequentially
+            for filename in os.listdir(args.path):
+                if not filename.endswith('.txt'):
+                    continue
+                results = process_file(args.path, filename, passed_dir=passed_dir, failed_dir=failed_dir, num_tests=args.num_tests, verbosity=args.verbosity, move_files=args.move_files)
+                if results[0] == "pass":
+                    all_answers.append(f"{filename}: {results[1]}")
+                    num_passed += 1
+                elif results[0] == "fail":
+                    num_failed += 1
+                else:
+                    num_errors += 1
+        else:
+            # Use ProcessPool for parallel processing
+            files_to_process = [f for f in os.listdir(args.path) if f.endswith('.txt')]
+            
+            with concurrent.futures.ProcessPoolExecutor(max_workers=args.max_workers) as executor:
+                future_to_file = {
+                    executor.submit(
+                        process_file, 
+                        args.path, 
+                        filename, 
+                        passed_dir=passed_dir, 
+                        failed_dir=failed_dir, 
+                        num_tests=args.num_tests, 
+                        verbosity=args.verbosity, 
+                        move_files=args.move_files
+                    ): filename for filename in files_to_process
+                }
+                
+                for future in concurrent.futures.as_completed(future_to_file):
+                    filename = future_to_file[future]
+                    try:
+                        results = future.result()
+                        if results[0] == "pass":
+                            all_answers.append(f"{filename}: {results[1]}")
+                            num_passed += 1
+                        elif results[0] == "fail":
+                            num_failed += 1
+                        else:
+                            num_errors += 1
+                    except Exception as e:
+                        print(f"Error processing {filename}: {e}")
+                        num_errors += 1
+
+        answers_path = os.path.join(passed_dir, "answers.txt")
+        with open(answers_path, 'a') as f:
+                for answer in all_answers:
+                    f.write(f"{answer}\n")
+        print(f"\nSummary: {num_passed} passed, {num_failed} failed, {num_errors} errors")
     else:
-        test_measure_construction(args.path, args.num_tests, verbose=args.verbose) 
+        if args.verbosity < 2:
+            args.verbosity = 2
+        test_measure_construction(args.path, args.num_tests, verbosity=args.verbosity) 
 
 if __name__ == "__main__":
     main()

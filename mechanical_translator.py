@@ -1,3 +1,4 @@
+import math
 import os
 import argparse
 import glob
@@ -12,15 +13,119 @@ import concurrent.futures
 import threading
 import random  # Add this import for random selection
 from dataclasses import dataclass
+from geo_types import AngleSize
 global_timestamp = str(int(time.time()))
 # Add a file lock for thread-safe writing
 file_lock = threading.Lock()
+
+def invert_pi_expression(value):
+    if isinstance(value, AngleSize):
+        value = value.x
+    if isinstance(value, str):
+        value = float(value)
+    if abs(value - math.pi) < 1e-4:
+        return "pi"
+    elif abs(value - math.pi / 2) < 1e-4:
+        return "pi/2"
+    elif abs(value - math.pi / 3) < 1e-4:
+        return "pi/3"
+    elif abs(value - 2 * math.pi / 3) < 1e-4:
+        return "2pi/3"
+    elif abs(value - math.pi / 4) < 1e-4:
+        return "pi/4"
+    elif abs(value - 3 * math.pi / 4) < 1e-4:
+        return "3pi/4"
+    elif abs(value - math.pi / 5) < 1e-4:
+        return "pi/5"
+    elif abs(value - 2 * math.pi / 5) < 1e-4:
+        return "2pi/5"
+    elif abs(value - 3 * math.pi / 5) < 1e-4:
+        return "3pi/5"
+    elif abs(value - 4 * math.pi / 5) < 1e-4:
+        return "4pi/5"
+    elif abs(value - math.pi / 6) < 1e-4:
+        return "pi/6"
+    elif abs(value - 5 * math.pi / 6) < 1e-4:
+        return "5pi/6"
+    elif abs(value - math.pi / 7) < 1e-4:
+        return "pi/7"
+    elif abs(value - 2 * math.pi / 7) < 1e-4:
+        return "2pi/7"
+    elif abs(value - 3 * math.pi / 7) < 1e-4:
+        return "3pi/7"
+    elif abs(value - 4 * math.pi / 7) < 1e-4:
+        return "4pi/7"
+    elif abs(value - 5 * math.pi / 7) < 1e-4:
+        return "5pi/7"
+    elif abs(value - 6 * math.pi / 7) < 1e-4:
+        return "6pi/7"
+    elif abs(value - math.pi / 8) < 1e-4:
+        return "pi/8"
+    elif abs(value - 3 * math.pi / 8) < 1e-4:
+        return "3pi/8"
+    elif abs(value - 5 * math.pi / 8) < 1e-4:
+        return "5pi/8"
+    elif abs(value - 7 * math.pi / 8) < 1e-4:
+        return "7pi/8"
+    elif abs(value - math.pi / 9) < 1e-4:
+        return "pi/9"
+    elif abs(value - 2 * math.pi / 9) < 1e-4:
+        return "2pi/9"
+    elif abs(value - 4 * math.pi / 9) < 1e-4:
+        return "4pi/9"
+    elif abs(value - 5 * math.pi / 9) < 1e-4:
+        return "5pi/9"
+    elif abs(value - 7 * math.pi / 9) < 1e-4:
+        return "7pi/9"
+    elif abs(value - 8 * math.pi / 9) < 1e-4:
+        return "8pi/9"
+    elif abs(value - math.pi / 10) < 1e-4:
+        return "pi/10"
+    elif abs(value - 3 * math.pi / 10) < 1e-4:
+        return "3pi/10"
+    elif abs(value - 7 * math.pi / 10) < 1e-4:
+        return "7pi/10"
+    elif abs(value - 9 * math.pi / 10) < 1e-4:
+        return "9pi/10"
+    elif abs(value - math.pi / 11) < 1e-4:
+        return "pi/11"
+    elif abs(value - 2 * math.pi / 11) < 1e-4:
+        return "2pi/11"
+    elif abs(value - 3 * math.pi / 11) < 1e-4:
+        return "3pi/11"
+    elif abs(value - 4 * math.pi / 11) < 1e-4:
+        return "4pi/11"
+    elif abs(value - 5 * math.pi / 11) < 1e-4:
+        return "5pi/11"
+    elif abs(value - 6 * math.pi / 11) < 1e-4:
+        return "6pi/11"
+    elif abs(value - 7 * math.pi / 11) < 1e-4:
+        return "7pi/11"
+    elif abs(value - 8 * math.pi / 11) < 1e-4:
+        return "8pi/11"
+    elif abs(value - 9 * math.pi / 11) < 1e-4:
+        return "9pi/11"
+    elif abs(value - 10 * math.pi / 11) < 1e-4:
+        return "10pi/11"
+    elif abs(value - math.pi / 12) < 1e-4:
+        return "pi/12"
+    elif abs(value - 5 * math.pi / 12) < 1e-4:
+        return "5pi/12"
+    elif abs(value - 7 * math.pi / 12) < 1e-4:
+        return "7pi/12"
+    elif abs(value - 11 * math.pi / 12) < 1e-4:
+        return "11pi/12"
+    else:
+        return str(value)
+
 
 @dataclass
 class Command:
     name: str
     inputs: tuple[str]
     output: Optional[str] = None
+
+
 
 def translate_problem(contents: str) -> Optional[str]:
     """
@@ -426,18 +531,18 @@ def translate_problem(contents: str) -> Optional[str]:
         
         # Rotations
         "rotate_pap": [
-            "Rotate point {1} by angle {2} around point {3}, and call the resulting point {0}.",
-            "Create point {0} by rotating point {1} by angle {2} around point {3}.",
-            "Find point {0} by rotating point {1} through angle {2} with center of rotation at {3}.",
-            "Determine point {0} as the image of point {1} when rotated by angle {2} about point {3}.",
-            "Construct point {0} by turning point {1} through angle {2} around the fixed point {3}."
+            "Rotate point {1} by the measure of angle {2} around point {3}, and call the resulting point {0}.",
+            "Create point {0} by rotating point {1} by the measure of angle {2} around point {3}.",
+            "Find point {0} by rotating point {1} through the measure of angle {2} with center of rotation at {3}.",
+            "Determine point {0} as the image of point {1} when rotated by the measure of angle {2} about point {3}.",
+            "Construct point {0} by turning point {1} through the measure of angle {2} around the fixed point {3}."
         ],
         "rotate_pAp": [
-            "Rotate point {1} by angle {2} around point {3}, and call the resulting point {0}.",
-            "Create point {0} by rotating point {1} by angle {2} around point {3}.",
-            "Find point {0} by rotating point {1} through angle {2} with center of rotation at {3}.",
-            "Determine point {0} as the image of point {1} when rotated by angle {2} about point {3}.",
-            "Construct point {0} by turning point {1} through angle {2} around the fixed point {3}."
+            "Rotate point {1} by an angle of {2} radians around point {3}, and call the resulting point {0}.",
+            "Create point {0} by rotating point {1} by an angle of {2} radians around point {3}.",
+            "Find point {0} by rotating point {1} through an angle of {2} radians with center of rotation at {3}.",
+            "Determine point {0} as the image of point {1} when rotated by an angle of {2} radians about point {3}.",
+            "Construct point {0} by turning point {1} through an angle of {2} radians around the fixed point {3}."
         ],
         
         # Vectors
@@ -578,13 +683,13 @@ def translate_problem(contents: str) -> Optional[str]:
         # gather construction stats here, so it's all in one place
         if "point" in cmd:
             stats["num_raw_points_constructed"] += 1 # including point_at_distance*, not including intersection points
-        if "circle" in cmd: #including incircle, circumcircle
+        if "circle" in cmd: # including incircle, circumcircle
             stats["num_circles_constructed"] += 1
-        if "polygon" in cmd:
+        if "polygon" in cmd: # including rotate_polygon_about_center
             stats["num_polygons_constructed"] += 1
         if ("line" in cmd and "bisector" not in cmd) or "polar_pc" in cmd or "tangent_pc" in cmd: # this includes orthogonal lines, but not angle_bisector
             stats["num_lines_constructed"] += 1
-        if "segment" in cmd:
+        if "segment" in cmd or "diagonal_p" in cmd:
             stats["num_segments_constructed"] += 1
         if "angle" in cmd:
             stats["num_angles_constructed"] += 1
@@ -594,7 +699,7 @@ def translate_problem(contents: str) -> Optional[str]:
             stats["num_reflections"] += 1
         if "midpoint" in cmd or "line_bisector" in cmd:
             stats["num_midpoints_constructed"] += 1
-        if "rotate" in cmd:
+        if "rotate" in cmd: # including rotate_polygon_about_center
             stats["num_rotations"] += 1
         if "angular_bisector" in cmd:
             stats["num_angle_bisections"] += 1
@@ -622,6 +727,18 @@ def translate_problem(contents: str) -> Optional[str]:
         if cmd == "triangle_ppp":
             idents[outputs[0]] = inputs[0] + inputs[1] + inputs[2]
             continue
+        if cmd == "diagonal_p":
+            idents[outputs[0]] = "diagonal " + inputs[0] + inputs[1]
+            '''
+            line_templates = [
+                f"Construct the diagonal {inputs[0]}{inputs[1]}.",
+                f"Draw the diagonal from {inputs[0]} to {inputs[1]}.",
+                f"Create the diagonal {inputs[0]}{inputs[1]}."
+            ]
+            translated_line = random.choice(line_templates)
+            result_lines.append(translated_line)
+            '''
+            continue
         
         if cmd == "polygon_ppi":
             num_sides = int(inputs[-1])
@@ -646,9 +763,29 @@ def translate_problem(contents: str) -> Optional[str]:
 
         if cmd == "polygon_from_center_and_circumradius":
             polygon_templates = [
-                f"Construct a regular polygon with {inputs[0]} sides, centered at {inputs[1]} with a circumradius of {inputs[2]}. Call the resulting polygon {outputs[0]}.",
-                f"Create a regular {inputs[0]}-sided polygon with center at point {inputs[1]} and circumradius equal to {inputs[2]}. Label this polygon as {outputs[0]}.",
-                f"Draw a regular polygon having {inputs[0]} sides, with its center at {inputs[1]} and distance {inputs[2]} from center to any vertex. Name this polygon {outputs[0]}."
+                f"Construct a regular polygon with {inputs[0]} sides, centered at {inputs[1]} with a circumradius of {inputs[2]}. Call the resulting polygon {outputs[-1]}, and its vertices (in counterclockwise order) {outputs[:-1]}.",
+                f"Create a regular {inputs[0]}-sided polygon with center at point {inputs[1]} and circumradius equal to {inputs[2]}. Label this polygon as {outputs[-1]}, and its vertices (in counterclockwise order) {outputs[:-1]}.",
+                f"Draw a regular polygon having {inputs[0]} sides, with its center at {inputs[1]} and distance {inputs[2]} from center to any vertex. Name this polygon {outputs[-1]}, and its vertices (in counterclockwise order) {outputs[:-1]}."
+            ]
+            translated_line = random.choice(polygon_templates)
+            result_lines.append(translated_line)
+            continue
+
+        if cmd == "rotate_polygon_about_center_by_equivalent_angle":
+            polygon_templates = [
+                f"Rotate the polygon {inputs[0]} about its center counterclockwise by an angle equivalent to the measure of angle {inputs[1]}. Call the resulting polygon {outputs[-1]}, and the corresponding vertices {outputs[:-1]}.",
+                f"Create the polygon {outputs[-1]} by rotating the polygon {inputs[0]} counterclockwise  about its center by the same angle as the measure of angle {inputs[1]}. Label the vertices of the resulting polygon {outputs[:-1]}, in correspondence to the vertices of {inputs[0]}.",
+                f"Draw the polygon {outputs[-1]} by rotating {inputs[0]} counterclockwise about its center by an angle equal to the measure of angle {inputs[1]}. Label the vertices of the resulting polygon {outputs[:-1]}, in correspondence to the vertices of {inputs[0]}."
+            ]
+            translated_line = random.choice(polygon_templates)
+            result_lines.append(translated_line)
+            continue
+
+        if cmd == "rotate_polygon_about_center":
+            polygon_templates = [
+                f"Rotate the polygon {inputs[0]} about its center counterclockwise by an angle of {invert_pi_expression(inputs[1])} radians. Call the resulting polygon {outputs[-1]}, and the corresponding vertices {outputs[:-1]}.",
+                f"Create the polygon {outputs[-1]} by rotating the polygon {inputs[0]} counterclockwise about its center by an angle of {invert_pi_expression(inputs[1])} radians. Label the vertices of the resulting polygon {outputs[:-1]}, in correspondence to the vertices of {inputs[0]}.",
+                f"Draw the polygon {outputs[-1]} by rotating {inputs[0]} counterclockwise about its center by an angle of {invert_pi_expression(inputs[1])} radians. Label the vertices of the resulting polygon {outputs[:-1]}, in correspondence to the vertices of {inputs[0]}."
             ]
             translated_line = random.choice(polygon_templates)
             result_lines.append(translated_line)
@@ -667,7 +804,7 @@ def translate_problem(contents: str) -> Optional[str]:
                     continue
             except Exception as e:
                 pdb.set_trace()
-            if "angle" in command_constructed_by[raw_inputs[0]].name:
+            if "angle_ppp" in command_constructed_by[raw_inputs[0]].name:
                 measure_templates = [
                     f"What is the measure of angle {inputs[0]}, in radians?",
                     f"Find the measure of angle {inputs[0]}, in radians."
@@ -793,7 +930,7 @@ def process_file_contents(filename: str, contents: str, answer: str, output_dir:
             f.write(json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename, "stats": stats}) + "\n")
 
 
-def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}, max_workers: int = 4) -> None:
+def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}, max_workers: int = 4, sequential: bool = False) -> None:
     """
     Search the 'passed' directory for subdirectories that look like timestamps
     and process their contents if they come after the specified timestamp.
@@ -812,7 +949,7 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
         item_path = os.path.join(passed_dir, item)
         if os.path.isdir(item_path) and item.isdigit():
             timestamp = int(item)
-            if after is None or timestamp > after:
+            if after is None or timestamp >= after:
                 timestamp_dirs.append((timestamp, item_path))
     
     # Sort directories by timestamp
@@ -842,14 +979,18 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
             all_tasks.append((f"{dir_path}/{filename}", contents, answer, output_dir, hash))
     
     # Process all tasks in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
-        for future in concurrent.futures.as_completed(futures):
-            filename = futures[future]
-            #try:
-            future.result()
-            # except Exception as exc:
-            #     print(f"Processing of {filename} generated an exception: {exc}")
+    if sequential:
+        for task in all_tasks:
+            process_file_contents(*task)
+    else:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
+            for future in concurrent.futures.as_completed(futures):
+                filename = futures[future]
+                #try:
+                future.result()
+                # except Exception as exc:
+                #     print(f"Processing of {filename} generated an exception: {exc}")
 
 def read_hashes(output_dir: Path) -> Dict[str, bool]:
     hashes = {}
@@ -872,9 +1013,11 @@ def main() -> None:
                         help="Disable hash checking")
     parser.add_argument("--max_workers", type=int, default=16,
                         help="Maximum number of parallel workers")
+    parser.add_argument("--sequential", action="store_true",
+                        help="Process files singlethreaded (for debugging)")
     args = parser.parse_args()
     hashes = read_hashes(args.output_dir) if args.hash_check else {}
-    process_timestamp_dirs(args.output_dir, args.after, hashes, args.max_workers)
+    process_timestamp_dirs(args.output_dir, args.after, hashes, args.max_workers, args.sequential)
 
 
 if __name__ == "__main__":

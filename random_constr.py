@@ -1,5 +1,6 @@
 import os, pdb
 from geo_types import *
+import math
 
 type_to_shortcut = {
     int       : 'i',
@@ -73,10 +74,9 @@ class Command:
         self.label_dict = label_dict
 
     def apply(self):
+        # print(self)
         input_data = [x.data for x in self.input_elements]
-
         name = command_types_name(self.name, input_data)
-
         if name not in command_dict: name = self.name
         f = command_dict[name]
         output_data = f(*input_data)
@@ -92,6 +92,8 @@ class Command:
                 self.output_elements = [Element(self.label_factory(), self.label_dict) for _ in range(len(output_data))]
                 for x,o in zip(output_data, self.output_elements):
                     o.data = x
+            else:
+                raise ValueError("No label factory and no output elements for command: {}".format(self.name))
 
     def __repr__(self):
         inputs_str = ' '.join([x.label for x in self.input_elements])
@@ -117,7 +119,7 @@ class ConstCommand:
     def apply(self):
         self.element.data = self.datatype(self.value)
 
-    def __str__(self):
+    def __repr__(self):
         datatype_str = const_type_to_str[self.datatype]
         return "const {} {} -> {}".format(datatype_str, self.value, self.element.label)
 

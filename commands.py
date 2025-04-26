@@ -1,12 +1,17 @@
+import pdb
 import numpy as np
 import geo_types as gt
 import random
 from typing import List, Tuple, Union, Optional, Any
 
 def angle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Angle:
+    assert(not np.isclose(p1.a, p2.a).all())
+    assert(not np.isclose(p2.a, p3.a).all())
+    assert(not np.isclose(p3.a, p1.a).all())
     return gt.Angle(p2.a, p2.a-p1.a, p2.a-p3.a)
 
 def angular_bisector_ll(l1: gt.Line, l2: gt.Line) -> List[gt.Line]:
+    assert(not np.isclose(l1.n, l2.n).all())
     x = intersect_ll(l1, l2)
     n1, n2 = l1.n, l2.n
     if np.dot(n1, n2) > 0: n = n1 + n2
@@ -17,6 +22,9 @@ def angular_bisector_ll(l1: gt.Line, l2: gt.Line) -> List[gt.Line]:
     ]
 
 def angular_bisector_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Line:
+    assert(not np.isclose(p1.a, p2.a).all())
+    assert(not np.isclose(p2.a, p3.a).all())
+    assert(not np.isclose(p3.a, p1.a).all())
     v1 = p2.a - p1.a
     v2 = p2.a - p3.a
     v1 /= np.linalg.norm(v1)
@@ -149,9 +157,8 @@ def are_perpendicular_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Boolean:
     return are_perpendicular_ll(s1, s2)
 
 def area_P(polygon: gt.Polygon) -> gt.Measure:
-    points = [gt.Point(p) for p in polygon.points]
-    p0 = points[0].a
-    vecs = [p.a - p0 for p in points[1:]]
+    p0 = polygon.points[0].a
+    vecs = [p.a - p0 for p in polygon.points[1:]]
     cross_sum = sum(
         np.cross(v1, v2)
         for v1, v2 in zip(vecs, vecs[1:])
@@ -272,38 +279,13 @@ def intersect_cs(circle: gt.Circle, segment: gt.Segment) -> List[gt.Point]:
     results = intersect_lc(segment, circle)
     return [x for x in results if segment.contains(x.a)]
 
-def intersect_lr(line: gt.Line, ray: gt.Ray) -> gt.Point:
-    result = intersect_ll(line, ray)
-    assert(ray.contains(result.a))
-    return result
-
 def intersect_ls(line: gt.Line, segment: gt.Segment) -> gt.Point:
     result = intersect_ll(line, segment)
     assert(segment.contains(result.a))
     return result
 
-def intersect_rl(ray: gt.Ray, line: gt.Line) -> gt.Point:
-    result = intersect_ll(ray, line)
-    assert(ray.contains(result.a))
-    return result
-
-def intersect_rr(r1: gt.Ray, r2: gt.Ray) -> gt.Point:
-    result = intersect_ll(r1, r2)
-    assert(r1.contains(result.a))
-    assert(r2.contains(result.a))
-    return result
-
-def intersect_rs(ray: gt.Ray, segment: gt.Segment) -> gt.Point:
-    result = intersect_ll(ray, segment)
-    assert(ray.contains(result.a))
-    assert(segment.contains(result.a))
-    return result
-
 def intersect_sl(segment: gt.Segment, line: gt.Line) -> gt.Point:
     return intersect_ls(line, segment)
-
-def intersect_sr(segment: gt.Segment, ray: gt.Ray) -> gt.Point:
-    return intersect_rs(ray, segment)
 
 def intersect_ss(s1: gt.Segment, s2: gt.Segment) -> gt.Point:
     result = intersect_ll(s1, s2)
@@ -330,9 +312,6 @@ def line_pp(p1: gt.Point, p2: gt.Point) -> gt.Line:
     assert((p1.a != p2.a).any())
     n = gt.vector_perp_rot(p1.a-p2.a)
     return gt.Line(n, np.dot(p1.a, n))
-
-def line_pr(point: gt.Point, ray: gt.Ray) -> gt.Line:
-    return line_pl(point, ray)
 
 def line_ps(point: gt.Point, segment: gt.Segment) -> gt.Line:
     return line_pl(point, segment)
@@ -409,9 +388,6 @@ def mirror_ps(point: gt.Point, segment: gt.Segment) -> gt.Point:
 def orthogonal_line_pl(point: gt.Point, line: gt.Line) -> gt.Line:
     return gt.Line(line.v, np.dot(line.v, point.a))
 
-def orthogonal_line_pr(point: gt.Point, ray: gt.Ray) -> gt.Line:
-    return orthogonal_line_pl(point, ray)
-
 def orthogonal_line_ps(point: gt.Point, segment: gt.Segment) -> gt.Line:
     return orthogonal_line_pl(point, segment)
 
@@ -472,8 +448,6 @@ def ratio_mm(m1: gt.Measure, m2: gt.Measure) -> gt.Measure:
     assert(not np.isclose(m1.x, 0))
     return gt.Measure(m1.x / m2.x, m1.dim - m2.dim)
 
-def ray_pp(p1: gt.Point, p2: gt.Point) -> gt.Ray:
-    return gt.Ray(p1.a, p2.a-p1.a)
 
 def rotate_pap(point: gt.Point, angle: gt.Angle, by_point: gt.Point) -> gt.Point:
     return gt.Point(by_point.a + gt.rotate_vec(point.a - by_point.a, angle.angle))
@@ -565,11 +539,11 @@ def point_pm(point: gt.Point, distance: int) -> gt.Point:
     return gt.Point(point.a + distance * gt.random_direction())
 
 def circumcircle_p(p: gt.Polygon) -> gt.Circle:
-    return gt.Circle(p.center, np.linalg.norm(p.points[0] - p.center))
+    return gt.Circle(p.center, np.linalg.norm(p.points[0].a - p.center.a))
 
 
 def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Triangle:
-    return [p1, p2, p3, gt.Triangle(p1, p2, p3)]
+    return gt.Triangle(p1, p2, p3)
 
 def circumcircle_t(t: gt.Triangle) -> gt.Circle:
     return circle_ppp(t.a, t.b, t.c)
@@ -581,8 +555,8 @@ def circumradius_t(t: gt.Triangle) -> gt.Measure:
     return radius_c(circumcircle_t(t))
 
 def centroid_t(t: gt.Triangle) -> gt.Point:
-    median_a = gt.Segment(t.a, midpoint_pp(t.b, t.c))
-    median_b = gt.Segment(t.b, midpoint_pp(t.a, t.c))
+    median_a = segment_pp(t.a, midpoint_pp(t.b, t.c))
+    median_b = segment_pp(t.b, midpoint_pp(t.a, t.c))
     return intersect_ss(median_a, median_b)
 
 def incircle_t(t: gt.Triangle) -> gt.Circle:
@@ -598,7 +572,7 @@ def incircle_t(t: gt.Triangle) -> gt.Circle:
     side_a = line_pp(t.b, t.c)
     distance = abs(np.dot(incenter.a, side_a.n) - side_a.c)
     
-    return gt.Circle(incenter.a, distance)
+    return gt.Circle(incenter, distance)
 
 def incenter_t(t: gt.Triangle) -> gt.Point:
     """Returns the incenter of a triangle - the center of the incircle."""
@@ -622,7 +596,7 @@ def orthocenter_t(t: gt.Triangle) -> gt.Point:
     # Orthocenter is the intersection of the altitudes
     return intersect_ll(alt1, alt2)
 
-def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radius: Union[gt.Measure, float]) -> gt.Polygon:
+def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radius: Union[gt.Measure, float]) -> List[Union[gt.Polygon, gt.Point]]:
     """Create a regular polygon with specified number of sides, center, and circumradius."""
     # Extract radius value from Measure object if needed
     r = radius.x if isinstance(radius, gt.Measure) else float(radius)
@@ -634,7 +608,7 @@ def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radiu
         # Using polar coordinates to place points evenly
         x = center.a[0] + r * np.cos(angle)
         y = center.a[1] + r * np.sin(angle)
-        points.append(np.array([x, y]))
+        points.append(gt.Point(np.array([x, y])))
     
     return points + [gt.Polygon(points)]
 
@@ -644,24 +618,33 @@ or for a more complicated problem you could imagine some intermediate constructi
 H is rotated about its center counterclockwise by an angle M. Afterwards, the chord DF and the chord AE are drawn, and the point G is constructed at their intersection. G has distance N from the initial position of vertex A. What is the measure of angle M?
 """
 
-def rotate_polygon_about_center(polygon: gt.Polygon, angle: gt.Angle) -> gt.Polygon:
+def rotate_polygon_about_center_by_equivalent_angle(polygon: gt.Polygon, angle: gt.Angle) -> List[Union[gt.Polygon, gt.Point]]:
     points = []
     for i in range(len(polygon.points)):  
-        points.append(rotate_pAp(polygon.points[i], angle, polygon.center))
-    return gt.Polygon(points)
+        points.append(rotate_pap(polygon.points[i], angle, polygon.center))
+    return points + [gt.Polygon(points)]
 
-def random_chord_c(circle: gt.Circle) -> gt.Segment:
-    p1 = point_c(circle)
-    p2 = point_c(circle)
+def rotate_polygon_about_center(polygon: gt.Polygon, angle_measure: gt.AngleSize) -> List[Union[gt.Polygon, gt.Point]]:
+    points = []
+    for i in range(len(polygon.points)):  
+        points.append(rotate_pAp(polygon.points[i], angle_measure, polygon.center))
+    return points + [gt.Polygon(points)]
+
+"""
+This function was removed because it needs special output semantics like diagonal_p, but is not worth it.
+The points of interest need to also be constructed, in this case, and passed as output.
+def chord_c(circle: gt.Circle) -> gt.Segment:
+    p1: gt.Point = point_c(circle)
+    p2: gt.Point = point_c(circle)
     while np.isclose(p1.a, p2.a).all():
         p2 = point_c(circle)
-    return gt.Segment(p1, p2)
+    return segment_pp(p1, p2)
+"""
+    
+# Not special. Needs surrounding logic to sample the actual diagonal,
+# due to the constraints from command.apply() on the output semantics of this function.
+# This function simply has a different name from segment_pp so it can be translated differently.
+def diagonal_p(p1: gt.Point, p2: gt.Point) -> gt.Segment:
+    return segment_pp(p1, p2)
 
-def random_diagonal_p(polygon: gt.Polygon) -> gt.Segment:
-    """Returns a random diagonal of a polygon (a segment connecting two non-adjacent vertices)."""
-    n = len(polygon.points)
-    while True:
-        i, j = random.sample(range(n), 2)
-        if abs(i - j) % n != 1 and abs(i - j) % n != n - 1: 
-            return gt.Segment(polygon.points[i], polygon.points[j])
         

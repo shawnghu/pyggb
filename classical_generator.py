@@ -8,11 +8,11 @@ import os
 import argparse
 from typing import Dict, List, Set, Tuple, Any, Union, Optional, Generator, Callable
 import pdb
-
+import concurrent.futures
 # Import the commands module
 import commands
 import geo_types as gt
-from geo_types import MEASURABLE_TYPES
+from geo_types import MEASURABLE_TYPES, AngleSize
 
 # Import required functions from random_constr.py directly
 from random_constr import Command, Element, ConstCommand
@@ -134,6 +134,10 @@ class ClassicalGenerator:
         self.pruned_command_sequence: List[Command] = []
         self.made_polygon_already: bool = False
         self.made_triangle_already: bool = False
+        self.element_to_constructed_command: Dict[Element, Command] = {}
+        # this has to exist because when we construct a polygon, the vertices and polygon are not naturally associated at the Element level.
+        # the polygon is naturally aware of the vertices, but not necessarily of the Elements representing them, which is needed for the analysis done in this script.
+        self.poly_to_vertices: Dict[Element, List[Element]] = {}
 
     def init_identifier_pool(self):
         self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
@@ -168,7 +172,7 @@ class ClassicalGenerator:
             }
         return commands_dict
 
-    def _get_unused_identifier(self, return_sequential: int ) -> str:
+    def _get_unused_identifier(self, return_sequential: int = 0) -> str:
         """Get an unused identifier from the pool."""
         id_pool = self.identifier_pool if self.identifier_pool and len(self.identifier_pool) > return_sequential else self.secondary_identifier_pool
         if return_sequential > 0 and len(id_pool) > return_sequential:
@@ -178,17 +182,19 @@ class ClassicalGenerator:
             identifier = id_pool.pop(idx)
         return identifier
 
+    # Identifiers assigned in this specific way are not automatically removed from the identifier pool,
+    # so user needs to make sure to do so themselves.
     def _assign_specific_identifiers(self) -> str:
         if self.identifier_queue:
             return self.identifier_queue.pop(0)
         else:
-            print("This wasn't supposed to happen. Ran out of identifiers to assign intentionally.")
+            print("This wasn't supposed to happen. Ran out of identifiers to assign intentionally; user should have specified a longer queue before trying to call this function.")
             return self._get_unused_identifier(return_sequential=0)
 
     def _is_compatible_type(self, value_type, required_type) -> bool:
         return value_type == required_type or required_type == Any
 
-    def _find_compatible_elements(self, required_type) -> List[Element]:
+    def _find_compatible_elements(self, required_type, angle_biases: Optional[List[float]] = None) -> List[Element]:
         """Find elements that have compatible types with the required type."""
         compatible = []
         
@@ -208,26 +214,73 @@ class ClassicalGenerator:
             actual_type = type(element.data)
             if self._is_compatible_type(actual_type, required_type):
                 compatible.append(element)
-        
+        if required_type == gt.AngleSize:
+            # construct a new AngleSize
+            if angle_biases is None:
+                angle = random.uniform(0, np.pi)
+            else:
+                angle = random.choice(angle_biases)
+            element, const_command = self._add_constant('AngleSize', angle)
+            return [element]
+                
         # If this is a numeric type (int or float)
-        if numeric_type is not None:
-            # Create a new constant with probability 0.8, even if compatible elements exist
-            if not compatible or random.random() < 0.8:
-                # Create a new constant with a random value
-                if numeric_type == int:
+        if numeric_type is not None:            
+            # Create a new constant with a random value
+            if numeric_type == int:
+                if compatible and random.random() < 0.2: # make a new const with the same value; maybe it'll be interesting
+                    value = random.choice(compatible).data
+                else:
                     value = random.randint(1, 12)
-                    element, const_command = self._add_constant('int', value)
-                    # Return the newly created element
-                    return [element]
-                else:  # float
+                element, const_command = self._add_constant('int', value)
+                # Return the newly created element
+                return [element]
+            else:  # float
+                if compatible and random.random() < 0.2:
+                    value = random.choice(compatible).data
+                else:
                     value = round(random.uniform(1, 5), 1)
-                    element, const_command = self._add_constant('float', value)
-                    # Return the newly created element
-                    return [element]
+                element, const_command = self._add_constant('float', value)
+                # Return the newly created element
+                return [element]
         
         return compatible
     
-    def _try_apply_command(self, cmd_name: str, input_elements: List[Element], label_factory: Callable[[], str] = self._get_unused_identifier) -> Tuple[bool, List[Element], Command]:
+    def _update_dependency_graph(self, command: Command) -> None:
+        if not self.dependency_graph:
+            return
+        input_elements = command.input_elements
+        output_elements = command.output_elements
+        # Add dependencies to the graph
+        for result_elem in output_elements:
+            # Add node and dependencies
+            self.dependency_graph.add_node(result_elem, command)
+            self.dependency_graph.add_dependency(result_elem, input_elements, command)
+
+    def _add_constant(self, const_type: str, value: Any) -> Tuple[Element, ConstCommand]:
+        identifier = self._get_unused_identifier()
+        
+        # Create the element
+        element = Element(identifier, self.identifiers)
+        
+        if const_type == 'int':
+            data = int(value)
+        elif const_type == 'float':
+            data = float(value)
+        elif const_type == 'AngleSize':
+            data = AngleSize(value)
+        const_command = ConstCommand(type(data), value, element)        
+        
+        const_command.apply()
+        self.command_sequence.append(const_command)
+        
+        # Add to dependency graph
+        if self.dependency_graph:
+            self.dependency_graph.add_node(element, const_command)
+            self.dependency_graph.add_dependency(element, [], const_command)
+            
+        return element, const_command
+
+    def _try_apply_command(self, cmd_name: str, input_elements: List[Element], label_factory: Callable[[], str] = None) -> Tuple[bool, Command]:
         """
         Try to execute a command and return its result.
         
@@ -236,26 +289,32 @@ class ClassicalGenerator:
             input_elements: List of Element objects containing the input data
             
         Returns:
-            Tuple of (success, output_elements, command):
+            Tuple of (success, command):
             - success: Boolean indicating if the command executed successfully
-            - output_elements: List of output Element objects if successful, empty list otherwise
             - command: The Command object that was executed
         """
+        if label_factory is None:
+            label_factory = self._get_unused_identifier
         try:
             command = Command(cmd_name, input_elements, label_factory=label_factory, label_dict=self.identifiers)
             command.apply()
+            
+            # solely for debugging
+            for output_elem in command.output_elements:
+                self.element_to_constructed_command[output_elem] = command
+
+            if 'rotate_polygon' in cmd_name or cmd_name == 'polygon_from_center_and_circumradius':
+                self.poly_to_vertices[command.output_elements[-1]] = command.output_elements[:-1]
             return True, command
         except Exception as e:
+            # print(e)
             return False, None
 
     def _sample_commands(self) -> Generator[str, None, None]:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
-        if not self.made_polygon_already:
-            command_names.append('polygon_from_center_and_circumradius') # double the probability of polygon construction
         if not self.made_triangle_already:
-            command_names.append('triangle_ppp')
-            command_names.append('triangle_ppp')
+            command_names.append('triangle_ppp') # double the probability of triangle construction
         random.shuffle(command_names)
         
         for cmd_name in command_names:
@@ -284,7 +343,6 @@ class ClassicalGenerator:
                     continue
             if cmd_name == 'polygon_from_center_and_circumradius':
                 self.made_polygon_already = True
-            
             yield cmd_name
 
     def _sample_polygon_sides(self) -> int:
@@ -292,22 +350,22 @@ class ClassicalGenerator:
         weights = [1, 2, 4, 1, 4, 1, 2, 1, 4]
         return random.choices(sides, weights)[0]
 
-    def _execute_new_command(self) -> Tuple[List[Element], Command]:
+    def _execute_new_command(self) -> Command:
         """
         Sample a random command that can be executed with existing elements.
         Returns a tuple of (input_elements, command) or None if no valid command can be sampled.
         """
-
         for cmd_name in self._sample_commands():
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
 
-            # Special case for commands that create points without parameters
+            # Special case for point_ with no parameters
+            # note: not sure this was necessary. i think other param logic is generic enough for this
             if cmd_name == 'point_' and len(param_types) == 0:
                 # Try to execute the command directly
                 success, command = self._try_apply_command(cmd_name, [])
                 if success:
-                    return [], command
+                    return command
                 else:
                     continue
             num_points = len([x for x in self.identifiers.values() if isinstance(x.data, gt.Point)])
@@ -315,7 +373,7 @@ class ClassicalGenerator:
                 if (num_points <= 2):
                     success, command = self._try_apply_command('point_', [])
                     if success:
-                        return [], command
+                        return command
                     else:
                         continue
                 else:
@@ -324,124 +382,87 @@ class ClassicalGenerator:
             # Skip commands that need parameters if we don't have any elements yet
             if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
                 continue
-                
-            # Try to find compatible parameters, ensuring they are unique
-            valid_params = True
-            input_elements = []
-            used_elements = set()  # Track used elements to ensure uniqueness
             
-            for param_type in param_types:
-                compatible = self._find_compatible_elements(param_type)
-                
+            # Try to find compatible parameters for the sampled command, ensuring they are unique
+            valid_params = True
+            if cmd_name == 'diagonal_p':
+                # special semantics for this command, kind of a hack
+                # simply sample two points and construct a segment, 
+                # but these two points have to be vertices of a polygon.
+                compatible = self._find_compatible_elements(gt.Polygon)
                 if not compatible:
-                    valid_params = False
-                    break
+                    continue
+                polygon_element: Element = random.choice(compatible)
+                n = len(polygon_element.data.points)
+                while True:
+                    i, j = random.sample(range(n), 2)
+                    if abs(i - j) % n != 1 and abs(i - j) % n != n - 1:
+                        break
+                # no need to construct the points, since they were already constructed
+                # as vertices of the polygon
+                points = self.poly_to_vertices[polygon_element]
+                input_elements = [points[i], points[j]]
+            else:
+                input_elements = []
+                used_elements = set()  # Track used elements to ensure uniqueness
                 
-                # Filter out already used elements
-                available_elements = [elem for elem in compatible if elem not in used_elements]
-                if not available_elements:
-                    valid_params = False
-                    break
-                
-                # Select a random compatible element
-                selected = random.choice(available_elements)
-                input_elements.append(selected)
-                used_elements.add(selected)  # Mark as used
+                for param_type in param_types:
+                    angle_biases = None
+                    if cmd_name == 'rotate_polygon_about_center' and param_type == gt.AngleSize:
+                        num_sides = len(input_elements[0].data.points)
+                        angle_biases = [np.pi / num_sides * i for i in range(1, num_sides)] # rotate by multiples of one-half internal angle
+                    compatible = self._find_compatible_elements(param_type, angle_biases)
+                    if not compatible:
+                        valid_params = False
+                        break
+                    
+                    # Filter out already used elements
+                    available_elements = [elem for elem in compatible if elem not in used_elements]
+                    if not available_elements:
+                        valid_params = False
+                        break
+                    
+                    # Select a random compatible element
+                    selected = random.choice(available_elements)
+                    input_elements.append(selected)
+                    used_elements.add(selected)
             if valid_params:
-                
-                if cmd_name == 'rotate_polygon_about_center':
-                    # e.g, map polygon ABCDEF to A'B'C'D'E'F'
-                    self.identifier_queue = [x.label + "'" for x in input_elements[0].data.points]
-                    label_factory = self._assign_specific_identifiers
-                elif cmd_name == 'polygon_from_center_and_circumradius':
-                    num_sides = self._sample_polygon_sides() # avoid problems with not enough sides on a constructed polygon
-                    input_elements[0].data = num_sides
-                    # assign sequential identifiers to the vertices of the polygon
-                    label_factory = functools.partial(self._get_unused_identifier, return_sequential=num_sides)
-                else:
-                    label_factory = self._get_unused_identifier
+                if cmd_name == 'polygon_from_center_and_circumradius':
+                    num_sides = self._sample_polygon_sides()
+                    element, _ = self._add_constant('int', num_sides)
+                    input_elements[0] = element
                 # Try to execute the command
-                success, command = self._try_apply_command(cmd_name, input_elements, label_factory)
+                success, command = self._try_apply_command(cmd_name, input_elements)
                 if success:
-                    return input_elements, command
+                    return command
                 else:
                     continue
         # we should never get here
-
-    def _update_dependency_graph(self, command: Command, input_elements: List[Element], output_elements: List[Element]) -> None:
-        if not self.dependency_graph:
-            return
-            
-        # Add dependencies to the graph
-        for result_elem in output_elements:
-            # Add node and dependencies
-            self.dependency_graph.add_node(result_elem, command)
-            self.dependency_graph.add_dependency(result_elem, input_elements, command)
-
-    def _add_constant(self, const_type: str, value: Any) -> Tuple[Element, ConstCommand]:
-        identifier = self._get_unused_identifier()
-        
-        # Create the element
-        element = Element(identifier, self.identifiers)
-        
-        if const_type == 'int':
-            data = int(value)
-        elif const_type == 'float':
-            data = float(value)
-        
-        # Create the ConstCommand
-        const_command = ConstCommand(type(data), value, element)
-        
-        # Apply the command to set the data
-        const_command.apply()
-        
-        # Add to command sequence
-        self.command_sequence.append(const_command)
-        
-        # Add to dependency graph
-        if self.dependency_graph:
-            self.dependency_graph.add_node(element, const_command)
-            self.dependency_graph.add_dependency(element, [], const_command)
-            
-        return element, const_command
+        raise Exception("Somehow ran out of commands???")
 
     def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
         commands_added = 0
         
-        # We need to start with a point
+        # Start with a point, since that's usually necessary
         success, command = self._try_apply_command('point_', [])
         self.command_sequence.append(command)
-        
-        # Add to dependency graph
-        input_elements = []
-        self._update_dependency_graph(command, input_elements, command.output_elements)
+        self._update_dependency_graph(command)
         
         commands_added += 1
-        
-        
         while commands_added < num_commands:
-            
             # Sample a command that can be executed
-            cmd_sample = self._execute_new_command()
-            if cmd_sample is None:
+            command = self._execute_new_command()
+            if command is None: # should not actually happen
                 continue
-                
-            input_elements, command = cmd_sample
-            
-            # Add the command to our sequence
-            self.command_sequence.append(command)
-
-            # Update dependency graph
-            self._update_dependency_graph(command, input_elements, command.output_elements)
-            
-            commands_added += 1
         
-        # We no longer add a measure command here, as it's added in compute_longest_construction
+            self.command_sequence.append(command)
+            self._update_dependency_graph(command)
+            commands_added += 1
         
         return self.command_sequence
 
-    def compute_longest_construction(self):
+    def compute_longest_construction(self, j):
         """
         Find the measurable quantity with the most ancestors and create a pruned
         construction sequence that includes only the commands needed to construct it.
@@ -502,32 +523,40 @@ class ClassicalGenerator:
         # so when you rename the output elements, you will rename every element which is actually used in the command sequence,
         # and the element object will be updated, passed around, and have the correct label when it is used as an input element.
         # in fact, trying to rename the input element will fail, because it has already been renamed.
-        ident_idx = 0
         self.init_identifier_pool() # this effectively destroys all ability to assign idents later, so we have to be sure that this is one of the last things we ever do with this generator.
-        # mapping = {}
         for command in ordered_commands:
             if isinstance(command, ConstCommand):
-                # mapping[command.element.label] = self.identifier_pool[ident_idx]
-                command.element.label = self.identifier_pool[ident_idx]
-                ident_idx += 1
+                command.element.label = self._get_unused_identifier()
                 continue
-            # for input_elem in command.input_elements:
-            #    input_elem.label = mapping[input_elem.label]
-            for output_elem in command.output_elements:
-                # mapping[output_elem.label] = self.identifier_pool[ident_idx]
-                output_elem.label = self.identifier_pool[ident_idx]
-                ident_idx += 1
-
+            if command.name == 'polygon_from_center_and_circumradius':
+                num_sides = command.input_elements[0].data
+                for i in range(num_sides):
+                    output_elem = command.output_elements[i]
+                    output_elem.label = self._get_unused_identifier(return_sequential=num_sides - i)
+                command.output_elements[-1].label = self._get_unused_identifier() # the polygon itself
+            elif command.name == 'rotate_polygon_about_center':
+                for idx, output_elem in enumerate(command.output_elements[:-1]):
+                    input_vertex = self.poly_to_vertices[command.input_elements[0]][idx]
+                    output_elem.label = input_vertex.label + "'"
+                command.output_elements[-1].label = command.input_elements[0].label + "'"
+            else:
+                for output_elem in command.output_elements:
+                    output_elem.label = self._get_unused_identifier()
+        '''
+        # this logic doesn't work anymore after the polygon rotation function was added
+        # rotating a polygon about its center often constructs new vertices in the exact same place...
         all_constructed_points = []
         for command in ordered_commands:
             if isinstance(command, ConstCommand):
                 continue
+            
             for output_elem in command.output_elements:
                 if isinstance(output_elem, gt.Point):
                     if any(np.isclose(output_elem.a, pt.a) for pt in all_constructed_points):
                         return False # just throw this one away; there's a degeneracy somewhere
                     else:
                         all_constructed_points.append(output_elem)
+        '''
         # effectively the retval
         self.pruned_command_sequence = ordered_commands
         return True
@@ -540,31 +569,40 @@ class ClassicalGenerator:
                 f.write(f"{cmd}\n")
 
 
+def write_construction(i, args):
+    seed = args.seed + i if args.seed is not None else None
+    generator = ClassicalGenerator(seed=seed)
+    generator.generate_construction(num_commands=args.num_commands)
+    
+    # Prune the construction to include only essential commands
+    success = generator.compute_longest_construction(i)
+    if not success:
+        return
+    
+    # Create unique filename if generating multiple constructions
+    filename = os.path.join(args.output_dir, f"construction_{i+1}.txt")
+        
+    generator.save_construction(filename, f"Generated construction #{i+1}")
+
 def main():
     parser = argparse.ArgumentParser(description="Generate classical geometric constructions")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
     parser.add_argument("--num_commands", type=int, default=25, help="Number of commands to generate")
     parser.add_argument("--output_dir", type=str, default="generated_constructions/", help="Output directory")
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to generate")
+    parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
+    parser.add_argument("--sequential", action="store_true", help="avoid multiprocessing")
     args = parser.parse_args()
     
     # Create output directory if it doesn't exist
     os.makedirs(args.output_dir, exist_ok=True)
-    
-    for i in range(args.count):
-        seed = args.seed + i if args.seed is not None else None
-        generator = ClassicalGenerator(seed=seed)
-        generator.generate_construction(num_commands=args.num_commands)
-        
-        # Prune the construction to include only essential commands
-        success = generator.compute_longest_construction()
-        if not success:
-            continue
-        
-        # Create unique filename if generating multiple constructions
-        filename = os.path.join(args.output_dir, f"construction_{i+1}.txt")
-            
-        generator.save_construction(filename, f"Generated construction #{i+1}")
+    if args.sequential:
+        for i in range(args.count):
+            write_construction(i, args)
+    else:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.max_workers) as executor:
+            futures = [executor.submit(write_construction, i, args) for i in range(args.count)]
+            concurrent.futures.wait(futures)
 
 
 if __name__ == "__main__":
