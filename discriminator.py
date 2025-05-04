@@ -136,21 +136,24 @@ def process_file(directory_path, filename, passed_dir="passed", failed_dir="fail
         return "fail", None
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description="Test geometric constructions")
     parser.add_argument("path", help="Path to construction file or directory")
     parser.add_argument("--verbosity", type=int, default=0, help="Print verbose output")
     parser.add_argument("--num_tests", type=int, default=20, help="Number of tests to run")
     parser.add_argument("--nomovefiles", action="store_false", dest="move_files", help="Don't move files to passed/ or failed/")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of processes to use")
-    parser.add_argument("--sequential", action="store_true", help="Run tests sequentially")
+    parser.add_argument("--multiprocess", action="store_true", help="Run tests in parallel")
     args = parser.parse_args()
+    return args
+
+def main(args):
     
     if os.path.isdir(args.path):
-        timestamp = str(int(time.time()))
+        timestamp = int(time.time())
         print(f"Output timestamp: {timestamp}")
-        passed_dir = os.path.join("passed/", timestamp)
-        failed_dir = os.path.join("failed/", timestamp)
+        passed_dir = os.path.join("passed/", str(timestamp))
+        failed_dir = os.path.join("failed/", str(timestamp))
 
         if args.move_files:
             os.makedirs(passed_dir, exist_ok=True)
@@ -162,7 +165,7 @@ def main():
         num_passed = 0
         num_failed = 0
         num_errors = 0
-        if args.sequential:
+        if not args.multiprocess:
             # Run sequentially
             for filename in os.listdir(args.path):
                 if not filename.endswith('.txt'):
@@ -217,6 +220,8 @@ def main():
         if args.verbosity < 2:
             args.verbosity = 2
         test_measure_construction(args.path, args.num_tests, verbosity=args.verbosity) 
+    return timestamp
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(args)

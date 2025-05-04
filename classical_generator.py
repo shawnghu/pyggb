@@ -13,9 +13,8 @@ import concurrent.futures
 import commands
 import geo_types as gt
 from geo_types import MEASURABLE_TYPES, AngleSize
-
-# Import required functions from random_constr.py directly
 from random_constr import Command, Element, ConstCommand
+
 
 class Node:
     """A node in the dependency graph representing an Element."""
@@ -37,13 +36,13 @@ class Node:
 class DependencyGraph:
     """A directed graph tracking Element dependencies in constructions."""
     def __init__(self):
-        self.nodes = {}  # Maps element label to Node object
-        
+        self.nodes: Dict[Element, Node] = {}
+
     def add_node(self, element: Element, command: Optional[Command] = None) -> Node:
         """Add a node to the graph."""
-        if element.label not in self.nodes:
-            self.nodes[element.label] = Node(element, command)
-        return self.nodes[element.label]
+        if element not in self.nodes:
+            self.nodes[element] = Node(element, command)
+        return self.nodes[element]
         
     def add_dependency(self, child_element: Element, parent_elements: List[Element], command: Command):
         """
@@ -88,28 +87,6 @@ class DependencyGraph:
         
         return count
     
-    def get_ancestors(self, element_label: str) -> Set[Element]:
-        """Get all ancestors (direct and indirect parents) of a node."""
-        if element_label not in self.nodes:
-            return set()
-            
-        ancestors = set()
-        to_process = [self.nodes[element_label]]
-        processed = set()
-        
-        while to_process:
-            current = to_process.pop()
-            if current in processed:
-                continue
-                
-            processed.add(current)
-            for parent in current.parents:
-                ancestors.add(parent.element)
-                if parent not in processed:
-                    to_process.append(parent)
-                    
-        return ancestors
-    
     def __repr__(self):
         return f"DependencyGraph with {len(self.nodes)} nodes"
 
@@ -138,6 +115,8 @@ class ClassicalGenerator:
         # this has to exist because when we construct a polygon, the vertices and polygon are not naturally associated at the Element level.
         # the polygon is naturally aware of the vertices, but not necessarily of the Elements representing them, which is needed for the analysis done in this script.
         self.poly_to_vertices: Dict[Element, List[Element]] = {}
+
+        self.all_segments: Dict[gt.Segment, bool] = {}
 
     def init_identifier_pool(self):
         self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
@@ -217,7 +196,7 @@ class ClassicalGenerator:
         if required_type == gt.AngleSize:
             # construct a new AngleSize
             if angle_biases is None:
-                angle = random.uniform(0, np.pi)
+                angle = random.choice(np.pi / 12 * np.arange(1, 13))
             else:
                 angle = random.choice(angle_biases)
             element, const_command = self._add_constant('AngleSize', angle)
@@ -226,22 +205,13 @@ class ClassicalGenerator:
         # If this is a numeric type (int or float)
         if numeric_type is not None:            
             # Create a new constant with a random value
-            if numeric_type == int:
-                if compatible and random.random() < 0.2: # make a new const with the same value; maybe it'll be interesting
-                    value = random.choice(compatible).data
-                else:
-                    value = random.randint(1, 12)
-                element, const_command = self._add_constant('int', value)
-                # Return the newly created element
-                return [element]
-            else:  # float
-                if compatible and random.random() < 0.2:
-                    value = random.choice(compatible).data
-                else:
-                    value = round(random.uniform(1, 5), 1)
-                element, const_command = self._add_constant('float', value)
-                # Return the newly created element
-                return [element]
+            if compatible and random.random() < 0.2: # make a new const with the same value; maybe it'll be interesting
+                value = random.choice(compatible).data
+            else:
+                value = random.randint(1, 12)
+            element, const_command = self._add_constant('int', value)
+            # Return the newly created element
+            return [element]
         
         return compatible
     
@@ -296,18 +266,19 @@ class ClassicalGenerator:
         if label_factory is None:
             label_factory = self._get_unused_identifier
         try:
+            if cmd_name == 'segment_pp' or cmd_name == 'diagonal_p':
+                if (input_elements[0], input_elements[1]) in self.all_segments:
+                    return False, None
             command = Command(cmd_name, input_elements, label_factory=label_factory, label_dict=self.identifiers)
             command.apply()
-            
-            # solely for debugging
-            for output_elem in command.output_elements:
-                self.element_to_constructed_command[output_elem] = command
 
             if 'rotate_polygon' in cmd_name or cmd_name == 'polygon_from_center_and_circumradius':
                 self.poly_to_vertices[command.output_elements[-1]] = command.output_elements[:-1]
+            if cmd_name == 'diagonal_p' or cmd_name == 'segment_pp':
+                self.all_segments[(command.input_elements[0], command.input_elements[1])] = True
+                self.all_segments[(command.input_elements[1], command.input_elements[0])] = True
             return True, command
         except Exception as e:
-            # print(e)
             return False, None
 
     def _sample_commands(self) -> Generator[str, None, None]:
@@ -317,6 +288,8 @@ class ClassicalGenerator:
             command_names.append('triangle_ppp') # double the probability of triangle construction
         random.shuffle(command_names)
         
+
+
         for cmd_name in command_names:
             if 'prove' in cmd_name or 'measure' in cmd_name:
                 continue # these are special commands, not part of constructions
@@ -333,16 +306,26 @@ class ClassicalGenerator:
             if 'power_' in cmd_name:
                 continue
 
+            # this one is boring, since if you get a number out of something, you can't get anything more useful out of it, and if have have a polygon, you always have its circumradius, so you always have its area.
+            if cmd_name == 'area_P':
+                continue
+
             
             cmd_info = self.available_commands[cmd_name]
             if cmd_info['return_type'] == gt.Boolean:
                 continue
-            # discourage multiple polygons
-            if self.made_polygon_already and cmd_name == 'polygon_from_center_and_circumradius':
-                if random.random() < 0.6:
-                    continue
+            # decrease frequency of polygons
             if cmd_name == 'polygon_from_center_and_circumradius':
-                self.made_polygon_already = True
+                # make sure they only happen near the beginning of the sequence, which is more natural
+                if len(self.command_sequence) > 3:
+                    continue
+                # eliminate duplicates
+                if self.made_polygon_already:
+                    continue
+                # still there are too many
+                if random.random() < 0.5:
+                    continue
+        
             yield cmd_name
 
     def _sample_polygon_sides(self) -> int:
@@ -442,23 +425,18 @@ class ClassicalGenerator:
 
     def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
-        commands_added = 0
-        
         # Start with a point, since that's usually necessary
         success, command = self._try_apply_command('point_', [])
         self.command_sequence.append(command)
         self._update_dependency_graph(command)
-        
-        commands_added += 1
-        while commands_added < num_commands:
+
+        while len(self.command_sequence) < num_commands:
             # Sample a command that can be executed
             command = self._execute_new_command()
             if command is None: # should not actually happen
                 continue
-        
             self.command_sequence.append(command)
             self._update_dependency_graph(command)
-            commands_added += 1
         
         return self.command_sequence
 
@@ -513,7 +491,9 @@ class ClassicalGenerator:
         # Create a new measure command for the target element
         measure_command = Command('measure', [target_node.element], label_factory=self._get_unused_identifier, label_dict=self.identifiers)
         measure_command.apply()
-        ordered_commands.append(measure_command)
+        self._update_dependency_graph(measure_command)
+        ordered_commands.append(measure_command)        
+
 
 
         # reassign identifiers starting from the beginning of the ident pool (shuffled, but with single char idents first),
@@ -542,25 +522,9 @@ class ClassicalGenerator:
             else:
                 for output_elem in command.output_elements:
                     output_elem.label = self._get_unused_identifier()
-        '''
-        # this logic doesn't work anymore after the polygon rotation function was added
-        # rotating a polygon about its center often constructs new vertices in the exact same place...
-        all_constructed_points = []
-        for command in ordered_commands:
-            if isinstance(command, ConstCommand):
-                continue
-            
-            for output_elem in command.output_elements:
-                if isinstance(output_elem, gt.Point):
-                    if any(np.isclose(output_elem.a, pt.a) for pt in all_constructed_points):
-                        return False # just throw this one away; there's a degeneracy somewhere
-                    else:
-                        all_constructed_points.append(output_elem)
-        '''
-        # effectively the retval
+
         self.pruned_command_sequence = ordered_commands
         return True
-
 
     def save_construction(self, filename: str, description: str = "Generated construction"):
         with open(filename, 'w') as f:
@@ -571,7 +535,8 @@ class ClassicalGenerator:
 
 def write_construction(i, args):
     seed = args.seed + i if args.seed is not None else None
-    generator = ClassicalGenerator(seed=seed)
+    generator_class = args.generator_class
+    generator = generator_class(seed=seed)
     generator.generate_construction(num_commands=args.num_commands)
     
     # Prune the construction to include only essential commands
@@ -584,19 +549,23 @@ def write_construction(i, args):
         
     generator.save_construction(filename, f"Generated construction #{i+1}")
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description="Generate classical geometric constructions")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
     parser.add_argument("--num_commands", type=int, default=25, help="Number of commands to generate")
     parser.add_argument("--output_dir", type=str, default="generated_constructions/", help="Output directory")
-    parser.add_argument("--count", type=int, default=20, help="Number of constructions to generate")
+    # note as a result of the multiprocessing, this is the number of construction attempts, not the number of constructions actually generated
+    parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
-    parser.add_argument("--sequential", action="store_true", help="avoid multiprocessing")
+    parser.add_argument("--multiprocess", action="store_true", help="use multiprocessing")
+    # parser.add_argument("--generator", type=str, default="ClassicalGenerator", help="Generator to use")
     args = parser.parse_args()
-    
+    return args
+
+def main(args):
     # Create output directory if it doesn't exist
     os.makedirs(args.output_dir, exist_ok=True)
-    if args.sequential:
+    if not args.multiprocess:
         for i in range(args.count):
             write_construction(i, args)
     else:
@@ -606,4 +575,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    args.generator_class = ClassicalGenerator
+    main(args)

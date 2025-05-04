@@ -603,20 +603,15 @@ def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radiu
     
     # Generate evenly spaced points around the circle
     points = []
+    phase = random.random() * 2 * np.pi # random phase shift -- we do not want the construction to depend on the orientation of the polygon.
     for i in range(num_sides):
-        angle = 2 * np.pi * i / num_sides
+        angle = 2 * np.pi * i / num_sides + phase
         # Using polar coordinates to place points evenly
         x = center.a[0] + r * np.cos(angle)
         y = center.a[1] + r * np.sin(angle)
         points.append(gt.Point(np.array([x, y])))
     
     return points + [gt.Polygon(points)]
-
-"""
-Suppose H is a 6-gon in the plane with vertices labeled ABCDEF in clockwise order, oriented such that AB is on the bottom side parallel to the x-axis. H is rotated about its center counterclockwise by an angle M. Afterwards, the chord DF has a slope of 0. What is the measure of angle M?
-or for a more complicated problem you could imagine some intermediate constructing steps, like
-H is rotated about its center counterclockwise by an angle M. Afterwards, the chord DF and the chord AE are drawn, and the point G is constructed at their intersection. G has distance N from the initial position of vertex A. What is the measure of angle M?
-"""
 
 def rotate_polygon_about_center_by_equivalent_angle(polygon: gt.Polygon, angle: gt.Angle) -> List[Union[gt.Polygon, gt.Point]]:
     points = []

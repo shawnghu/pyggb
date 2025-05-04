@@ -1,14 +1,85 @@
-        -TO DERISK, GET TO READING SOME TRANSLATED PROBLEMS ASAP.
-        - you can operationalize the structure by trying to write some problems by hand
-        [x] initial behavior is quite simple: simply start by constructing a polygon, and soon thereafter invoke a rotation on the polygon.
-        - tricky thing: should the rest of the diagram rotate as well? naturally, not, but then what is the nature of the relation to the original polygon, i.e, how do we ask about rotation?
-        - maybe you want to refer to the original polygon's vertices, maybe sometimes you also want to refer to the "rotated" polygon's vertices. 
-            [x] best trick for this is by making the idents variations on the originals, i.e, H gets rotated to H'.
-            [x] also, sample sequential idents specifically for the polygon 80% of the time.
-        [x] remember to sample interesting angles more often. override sample polygon sides or whatever it is, also
-        - determine whether it makes sense to do axis-alignment / specify absolute slopes/orientation. i think probably not, in a pure sense.
+aime questions are all in the passive voice, and do use stuff like "Let" or simply assert the existence of stuff from the jump.
 
-    - ONLY after the initial run is done, you can override commands.py.
+
+[d] generalize the parameterization logic for the exploratory geometry constructor.
+    [d] see if all reasonable generators are actually just variants of the main one by params.
+[x] move all the stuff into a single pipeline script
+- and integrate with yiyou's repo
+    [d] refactor the pipeline so that knowledge is carried forward. in particular, commands can easily be graded at construction time, and also translated directly from Command object. (Great opportunity for Cursor composer.)
+        - this also is not actually needed. in particular, there is no benefit from abstracting out measure_test.py.
+        [x] But the Construction parser can indeed be used for the translator, to derive types for everything. (Made the logic for translator incredibly simpler)
+- improve the wording of problems to be more like AIME problems
+    - read some AIME problems to get a sense of these
+    - heuristics for operating on lines
+    - rewording individual commands (particularly construction of individual points)
+
+- reduce the frequency of construction of polygons.
+
+- why are things still constructing multiple polygons?
+- special case constructions of polygons and triangles in translation.
+- sample only interesting angles and then special case the angles
+-
+
+- improve problem quality:
+    - look at the distribution of sampled commands more closely. some problems seem to be somewhat degenerate
+    [x] simply ban polygon construction more than once
+    [x] polygons are constructed at a fixed angle relative to the axes, which is a mistranslation. rotate polygon by a random amount.
+    [x] the same general concept means functions that return more than one output have been banned
+    [x] need to fix big random float angles
+
+
+- vim matters:
+- ctrl-i, ctrl-w clash pretty badly with things i often want to do (composer, close window)
+- does typing with vim keybinds actually make me noticeably faster?
+- if so, it's worth it to invest in
+- if not, fuck it
+
+
+- guiding principle for design: try to make this thing a tool that actually is useful for generating geometry problems. maybe is useful in itself.
+
+(other datasets may be easier of or lower quality)
+
+- develop "problem categories": (note here the emphasis on being able to perform "controlled" FT experiments)
+    - triangles and related
+    - circles and related
+    - lines and points and intersections and orthogonals
+    - other? polygons?
+    - other other?
+    - "coordinate"?
+
+- solve my vimrc problem
+- solve my left/right arrow key problem, more specifically
+
+- evaluate problem difficulty distribution better
+    - (just use the grader)
+    - build better automated tools
+
+- design a "compositional" geometry + "algebra" problem.
+    - note the design constraints: 
+    - the decomposition into two "subproblems" must be clear.
+    - ideally, should make use of our existing capabilities to some extent...
+
+- split exploratory geometry problems into categories for construction
+- build the new geometry "visualization" problem dataset
+
+- help design number theory problems/training set
+    - a product of three primes property?
+
+
+
+thinking out loud here:
+- the thing is potentially useful to others, and impressive in itself
+so we want to extend it to be general-purpose
+- so we want to define a language to describe all the things you may want to specify in the constructions.
+- not doing this is tantamount to asking the user to read the code and modify it themselves.
+- but most importantly, I think we don't need to do this right now, particularly since it doesn't seem like there are very good solutions.
+
+- uh, how are we gonna know if the distribution of questions is any good again?
+
+think of uses for deep research and etc.
+
+
+
 
 - note construction.render() function for visualizing the polygon intersection problems, later
 - implement line crossing problems.
@@ -30,11 +101,26 @@
 -geo-arith problem: construct a regular polygon. set an arithmetic condition on when to draw lines between points
 -subproblems: determine when the arithmetic condition holds. determine what the result of drawing the lines is:
 
--geo-combinatorics problem: aime dodecagon problem
 -subproblems: be generally good at combinatorics / counting intersections and shit. be better at geometry in the sense that we know how to handle rotations and shit.
 
+
+**************************************************************88
+Work log pre-20250430
+**************************************************************
+        -TO DERISK, GET TO READING SOME TRANSLATED PROBLEMS ASAP.
+        - you can operationalize the structure by trying to write some problems by hand
+        [x] initial behavior is quite simple: simply start by constructing a polygon, and soon thereafter invoke a rotation on the polygon.
+        - tricky thing: should the rest of the diagram rotate as well? naturally, not, but then what is the nature of the relation to the original polygon, i.e, how do we ask about rotation?
+        - maybe you want to refer to the original polygon's vertices, maybe sometimes you also want to refer to the "rotated" polygon's vertices. 
+            [x] best trick for this is by making the idents variations on the originals, i.e, H gets rotated to H'.
+            [x] also, sample sequential idents specifically for the polygon 80% of the time.
+        [x] remember to sample interesting angles more often. override sample polygon sides or whatever it is, also
+        - determine whether it makes sense to do axis-alignment / specify absolute slopes/orientation. i think probably not, in a pure sense.
+
 - general critique: by tuning the difficulty of the problem we can appear to achieve a result, assuming the fine tuning helps at all and the difficulty is approximately projected onto one dimension.
-- if composition is an entirely separate matter from capability at the subproblems then fine.
+if composition is an entirely separate matter from capability at the subproblems then fine.
+    - resolution: problems actually need to broken into "hierarchy of problems" of increasing difficulty, so you know model capabilities and can measure it somehow.
+
 
 
 **************************************************************88

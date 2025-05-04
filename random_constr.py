@@ -31,6 +31,7 @@ class Element:
     def __init__(self, label, element_dict):
         self.data = None
         self.label = label
+        self.command = None 
         assert(label not in element_dict)
         element_dict[label] = self
 
@@ -186,34 +187,41 @@ class Construction:
         data = data[:,:self.width]
         return data
 
-    def load(self, filename):
+    def load(self, filename=None, file_contents=None):
         self.nc_commands = []
         self.to_prove = None
         self.to_measure = None
         self.statement_type = None
         self.element_dict = dict()
-        with open(filename, 'r') as f:
-            for line in f:
-                command = parse_command(line, self.element_dict)
-                if command is None:
-                    continue
-                if isinstance(command, ConstCommand): command.apply()
-                elif isinstance(command, Command):
-                    if command.name == "prove":
-                        [inp] = command.input_elements
-                        [out] = command.output_elements
-                        if out is not None: del self.element_dict[out.label]
-                        assert(self.to_prove is None and self.to_measure is None)
-                        self.to_prove = inp
-                        self.statement_type = "prove"
-                    elif command.name == "measure":
-                        [inp] = command.input_elements
-                        [out] = command.output_elements
-                        if out is not None: del self.element_dict[out.label]
-                        assert(self.to_prove is None and self.to_measure is None)
-                        self.to_measure = inp
-                        self.statement_type = "measure"
-                    else: self.nc_commands.append(command)
+        self.const_commands = []
+        if filename:
+            with open(filename, 'r') as f:
+                file_contents = f.read()
+        if not file_contents:
+            raise ValueError("Called Construction.load with neither filename nor file_contents")
+        for line in file_contents.strip().split('\n'):
+            command = parse_command(line, self.element_dict)
+            if command is None:
+                continue
+            if isinstance(command, ConstCommand):
+                self.const_commands.append(command)
+                command.apply()
+            elif isinstance(command, Command):
+                if command.name == "prove":
+                    [inp] = command.input_elements
+                    [out] = command.output_elements
+                    if out is not None: del self.element_dict[out.label]
+                    assert(self.to_prove is None and self.to_measure is None)
+                    self.to_prove = inp
+                    self.statement_type = "prove"
+                elif command.name == "measure":
+                    [inp] = command.input_elements
+                    [out] = command.output_elements
+                    if out is not None: del self.element_dict[out.label]
+                    assert(self.to_prove is None and self.to_measure is None)
+                    self.to_measure = inp
+                    self.statement_type = "measure"
+                else: self.nc_commands.append(command)
 
         assert(self.statement_type is not None)
         assert(self.to_prove is not None or self.to_measure is not None)
