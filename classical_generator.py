@@ -14,7 +14,7 @@ import commands
 import geo_types as gt
 from geo_types import MEASURABLE_TYPES, AngleSize
 from random_constr import Command, Element, ConstCommand
-
+from sample_config import get_commands
 
 class Node:
     """A node in the dependency graph representing an Element."""
@@ -91,7 +91,7 @@ class DependencyGraph:
         return f"DependencyGraph with {len(self.nodes)} nodes"
 
 class ClassicalGenerator:
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, command_types=None):
         """Initialize the generator with a random seed for reproducibility."""
         if seed is not None:
             random.seed(seed)
@@ -105,6 +105,8 @@ class ClassicalGenerator:
         
         # Get all available commands from the commands module
         self.available_commands = self._get_commands()
+        if command_types:
+            self.available_commands = {k: v for k, v in self.available_commands.items() if k in get_commands(command_types)}
 
         self.command_sequence: List[Command] = []
         self.dependency_graph = DependencyGraph()
@@ -284,7 +286,7 @@ class ClassicalGenerator:
     def _sample_commands(self) -> Generator[str, None, None]:
         # Shuffle commands to try
         command_names = list(self.available_commands.keys())
-        if not self.made_triangle_already:
+        if not self.made_triangle_already and "triangle_ppp" in command_names:
             command_names.append('triangle_ppp') # double the probability of triangle construction
         random.shuffle(command_names)
         
@@ -536,7 +538,7 @@ class ClassicalGenerator:
 def write_construction(i, args):
     seed = args.seed + i if args.seed is not None else None
     generator_class = args.generator_class
-    generator = generator_class(seed=seed)
+    generator = generator_class(seed=seed, command_types=args.command_types)
     generator.generate_construction(num_commands=args.num_commands)
     
     # Prune the construction to include only essential commands
@@ -558,6 +560,8 @@ def parse_args():
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
     parser.add_argument("--multiprocess", action="store_true", help="use multiprocessing")
+    parser.add_argument("--command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "angle", "all"], 
+                        help="Types of geometric commands to include")
     # parser.add_argument("--generator", type=str, default="ClassicalGenerator", help="Generator to use")
     args = parser.parse_args()
     return args

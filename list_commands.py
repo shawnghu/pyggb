@@ -16,7 +16,8 @@ def extract_function_names():
     
     
 
-    print(', '.join(matches))
+    with open("all_commands.txt", "w") as file:
+        file.write('\n'.join(matches))
 
 if __name__ == "__main__":
     extract_function_names() 

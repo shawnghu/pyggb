@@ -177,12 +177,12 @@ def circle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Circle:
     center = intersect_ll(axis1, axis2)
     return circle_pp(center, p1)
 
-def circle_pm(p: gt.Point, m: gt.Measure) -> gt.Circle:
-    assert(m.dim == 1)
-    return gt.Circle(p.a, m.x)
-
-def circle_ps(p: gt.Point, s: gt.Segment) -> gt.Circle:
-    return gt.Circle(p.a, s.length)
+def circle_pm(p: gt.Point, m: Union[gt.Measure, int]) -> gt.Circle:
+    if isinstance(m, gt.Measure):
+        assert(m.dim == 1)
+        return gt.Circle(p.a, m.x)
+    else:
+        return gt.Circle(p.a, float(m))
 
 def contained_by_pc(point: gt.Point, by_circle: gt.Circle) -> gt.Boolean:
     return gt.Boolean(by_circle.contains(point.a))
@@ -403,22 +403,10 @@ def point_l(line: gt.Line) -> gt.Point:
 def point_s(segment: gt.Segment) -> gt.Point:
     return gt.Point(gt.interpolate(segment.end_points[0], segment.end_points[1], np.random.random()))
 
-def point_at_distance(point: gt.Point, distance: Union[gt.Measure, float, int]) -> gt.Point:
-    """
-    Create a point at a specified distance from an existing point.
-    The direction is chosen randomly.
-    """
-    # Handle both Measure objects and numeric values
-    if isinstance(distance, gt.Measure):
-        assert(distance.dim == 1 and distance.x > 0)
-        dist_value = distance.x
-    else:
-        # If it's a direct numeric value
-        dist_value = float(distance)
-        assert(dist_value > 0)
-        
-    return gt.Point(point.a + dist_value * gt.random_direction())
-
+def point_pm(point: gt.Point, distance: int) -> gt.Point:
+    """Create a point at a specified distance from an existing point in a random direction."""
+    assert(distance > 0)
+    return gt.Point(point.a + distance * gt.random_direction())
 
 def polar_pc(point: gt.Point, circle: gt.Circle) -> gt.Line:
     n = point.a - circle.c
@@ -533,16 +521,13 @@ def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, dista
         return gt.Point(closest_pt - line.v * distance)
 
 
-def point_pm(point: gt.Point, distance: int) -> gt.Point:
-    """Create a point at a specified distance from an existing point in a random direction."""
-    assert(distance > 0)
-    return gt.Point(point.a + distance * gt.random_direction())
-
 def circumcircle_p(p: gt.Polygon) -> gt.Circle:
     return gt.Circle(p.center, np.linalg.norm(p.points[0].a - p.center.a))
 
 
 def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Triangle:
+    'contained_by_pc',
+    'contained_by_pl',
     return gt.Triangle(p1, p2, p3)
 
 def circumcircle_t(t: gt.Triangle) -> gt.Circle:

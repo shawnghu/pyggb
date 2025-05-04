@@ -123,13 +123,13 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
             f"What is the length of diagonal {measured_object}?",
             f"Find the length of diagonal {measured_object}."
         ]
-        stats["measure_type"] = "segment_length"
+        stats["measure_type"] = "distance"
     elif "segment" in generating_command.name:
         measure_templates = [
             f"What is the length of segment {measured_object}?",
             f"Find the length of segment {measured_object}."
         ]
-        stats["measure_type"] = "segment_length"
+        stats["measure_type"] = "distance"
     # in the following cases, we are actually measuring a Measure that was constructed by the previous command
     elif generating_command.name in ("distance_pp", "radius_c", "circumradius_t", "area_P", "inradius_t"):
         last_line_inputs = [idents[x] if x in idents else x.label for x in generating_command.input_elements]
@@ -141,25 +141,25 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
                 f"What is the distance between points {last_line_inputs[0]} and {last_line_inputs[1]}?",
                 f"Find the distance between points {last_line_inputs[0]} and {last_line_inputs[1]}."
             ]
-            stats["measure_type"] = "two_points_distance"
+            stats["measure_type"] = "distance"
         elif "radius_c" in generating_command.name:
             measure_templates = [
                 f"What is the radius of circle {last_line_inputs[0]}?",
                 f"Find the radius of circle {last_line_inputs[0]}."
             ]
-            stats["measure_type"] = "circle_radius"
+            stats["measure_type"] = "distance"
         elif "inradius_t" in generating_command.name:
             measure_templates = [
                 f"What is the inradius of triangle {last_line_inputs[0]}?",
                 f"Find the inradius of triangle {last_line_inputs[0]}."
             ]
-            stats["measure_type"] = "triangle_inradius"
+            stats["measure_type"] = "triangle_special_property"
         elif "circumradius_t" in generating_command.name:
             measure_templates = [
                 f"What is the circumradius of triangle {last_line_inputs[0]}?",
                 f"Find the circumradius of triangle {last_line_inputs[0]}."
             ]
-            stats["measure_type"] = "triangle_circumradius"
+            stats["measure_type"] = "triangle_special_property"
         elif "area_P" in generating_command.name:
             measure_templates = [
                 f"What is the area of polygon {last_line_inputs[0]}?",

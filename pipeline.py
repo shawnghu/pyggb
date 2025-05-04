@@ -1,11 +1,6 @@
-import os
 import pdb
 from pathlib import Path
-import subprocess
 import argparse
-import time
-import concurrent.futures
-from typing import List, Tuple
 from classical_generator import main as generator_main
 from classical_generator import ClassicalGenerator
 from polygon_rotation_generator import PolygonRotationGenerator
@@ -16,6 +11,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the full geometry pipeline")
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
     parser.add_argument("--generator_class", type=str, default="ClassicalGenerator", help="Generator class to use")
+    parser.add_argument("--generator_command_types", type=str, default="base", help="Command types to use")
     parser.add_argument("--num_generator_commands", type=int, default=25, help="Number of commands to generate")
     parser.add_argument("--multiprocess", action="store_true")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
@@ -38,6 +34,7 @@ def main():
         count=args.count,
         generator_class=args.generator_class,
         num_commands=args.num_generator_commands,
+        command_types=args.generator_command_types,
         multiprocess=args.multiprocess,
         max_workers=args.max_workers,
         output_dir=args.generated_constructions_dir,

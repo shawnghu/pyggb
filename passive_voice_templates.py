@@ -576,8 +576,6 @@ def format_polygon_command(command, idents: Dict[Element, str]):
                 f"Let {vertices_str} be a regular {num_sides}-gon, centered at {center} with a circumradius of {circumradius}.",
                 f"{vertices_str} is a regular {num_sides}-gon, centered at {center} with a circumradius of {circumradius}.",
         ]
-        idents[command.output_elements[-1]] = vertices_str
-        return random.choice(polygon_templates)
     if command.name == "rotate_polygon_about_center_by_equivalent_angle":
         polygon_in = input_labels[0]
         angle = input_labels[1]
@@ -585,22 +583,29 @@ def format_polygon_command(command, idents: Dict[Element, str]):
         vertices = output_labels[:-1]
         vertices_str = ''.join(vertices)
         polygon_templates = [
-            f"The polygon {vertices_str} is drawn by rotating {polygon_in} counterclockwise about its center by an angle equal to the measure of angle {angle}.",
+            f"{vertices_str} is drawn by rotating {polygon_in} counterclockwise about its center by an angle equal to the measure of angle {angle}.",
             f"{polygon_in} is rotated about its center counterclockwise by an angle equal to the measure of angle {angle} to form {vertices_str}."
         ]
-        idents[command.output_elements[-1]] = vertices_str
-        return random.choice(polygon_templates)
     if command.name == "rotate_polygon_about_center":
         polygon_in = input_labels[0]
         angle = invert_pi_expression(input_labels[1])
-        polygon_out = output_labels[-1]
         vertices = output_labels[:-1]
         vertices_str = ''.join(vertices)
         polygon_templates = [
-            f"The polygon {vertices_str} is drawn by rotating {polygon_in} counterclockwise about its center by {angle} radians.",
+            f"{vertices_str} is drawn by rotating {polygon_in} counterclockwise about its center by {angle} radians.",
             f"{polygon_in} is rotated about its center counterclockwise by {angle} radians to form {vertices_str}."
         ]
-        idents[command.output_elements[-1]] = vertices_str
-        return random.choice(polygon_templates)
+    template = random.choice(polygon_templates)
+    # yes, it's extremely weird to describe a square in terms of its circumradius, but at least it is logically unambiguous.
+    if num_sides == 4:
+        template = template.replace("regular 4-gon", "square")
+    if num_sides == 6:
+        template = template.replace("6-gon", "hexagon")
+    if num_sides == 8:
+        template = template.replace("8-gon", "octagon")
+    if num_sides == 12:
+        template = template.replace("12-gon", "dodecagon")
+    idents[command.output_elements[-1]] = vertices_str
+    return template
         
         

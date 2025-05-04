@@ -1,3 +1,71 @@
+cursor hotkeys:
+    - bash: ctrl-y to paste. ctrl-/ to under
+    - focus chat hotkey?
+
+
+- high level agenda:
+- fix (some of) the dumb things
+[x] do restricted problem generation
+- fix dumb things in iteration if needed
+- add more commands(?)
+    - build triangle by fiat (return the points)
+        - equilateral triangle
+        - triangle with fixed lengths
+        - triangle with fixed angle measures
+            - too hard
+    - circle chords
+    - internally tangent circle
+    - externally tangent circle
+    - circle tangent to two others? (has the problem of always returning two circles if they are externally tangent. but can do a randomizer.)
+    - triangle area
+
+
+list of dumb things:
+- segment of fixed length is constructed, circle constructed with that as radius, we ask for the radius of the circle instead of just the length of the segment
+    - now circles can't be constructed with segment, only by two points, three points, or radius directly
+    - it's still possible to do dumb things like construct a circle with two points then ask for the radius, which is just the same as asking for the dist between the points.
+- likewise, it's possible to construct two points at a fixed distance and then just ask for the distance between those two points, which is kind of dumb.
+    - note fundamentally there are only like three kinds of measures: distance, angle, area (special triangle ops like circumradius, inradius). and area is not really possible for anything other than a triangle because areas of regular polygons are boring and irregular polygons can't be reliably constructed. 
+        [x] handled in translator measure type
+        - it will be good to add "ratio".
+    [x] special casing for regular polygons
+
+translations:
+- a point constructed at a fixed distance from another point is just called a segment, so do that
+    -instead of "A point G is placed so that it is 5 units away from point N in any direction." maybe  just "G is constructed so that NG = 5". Even worse if N was not constructed by important means, then it's just "NG = 5".
+
+- distribution of problems. Triangles can be constructed more easily. Somehow still too many polygons are constructed
+
+- currently we only have lines, triangles, circles, and regular polygons. what else?
+
+- need to create problem sampling logic
+- need to create sample distribution script
+
+sampling:
+-square 
+-square
+-rectangle with fixed coordinates
+- another rectangle
+-semicircle
+- ratio of segments (but before, remember, ratios weren't good because they only measured things that were always the same! if they measure things that differ, that would be great)
+- lots of segments lying on lines.
+- right triangles, triangles with fixed lengths (13-14-15 is common, so is pythagorean theorem)
+- triangles with fixed lengths
+- circle internally tangent to circle
+- circle can be tangent to two other circles
+- chords of fixed length
+
+
+
+- sometimes things only rely in any meaningful way on something constructed way down the line
+- note most functions only return one point, so this point should be meaningful in some way to the rest of the problem beforehand.
+- functions which only take one input are possibly pretty bad?
+
+- we can restore the degenerate point logic in the command sampling. 
+
+- and then, fix the translations so they're less ugly.
+
+
 aime questions are all in the passive voice, and do use stuff like "Let" or simply assert the existence of stuff from the jump.
 
 
@@ -9,27 +77,25 @@ aime questions are all in the passive voice, and do use stuff like "Let" or simp
         - this also is not actually needed. in particular, there is no benefit from abstracting out measure_test.py.
         [x] But the Construction parser can indeed be used for the translator, to derive types for everything. (Made the logic for translator incredibly simpler)
 - improve the wording of problems to be more like AIME problems
-    - read some AIME problems to get a sense of these
+    [x] read some AIME problems to get a sense of these
     - heuristics for operating on lines
-    - rewording individual commands (particularly construction of individual points)
+    [x] rewording individual commands (particularly construction of individual points)
 
-- reduce the frequency of construction of polygons.
+[x] reduce the frequency of construction of polygons.
 
-- why are things still constructing multiple polygons?
-- special case constructions of polygons and triangles in translation.
-- sample only interesting angles and then special case the angles
--
-
-- improve problem quality:
-    - look at the distribution of sampled commands more closely. some problems seem to be somewhat degenerate
+[x] special case constructions of polygons and triangles in translation (handled automatically by ident logic)
     [x] simply ban polygon construction more than once
     [x] polygons are constructed at a fixed angle relative to the axes, which is a mistranslation. rotate polygon by a random amount.
     [x] the same general concept means functions that return more than one output have been banned
     [x] need to fix big random float angles
 
+- improve problem quality:
+    - look at the distribution of sampled commands more closely. some problems seem to be somewhat degenerate
+
 
 - vim matters:
-- ctrl-i, ctrl-w clash pretty badly with things i often want to do (composer, close window)
+- ctrl-i, ctrl-w, ctrl-n clash pretty badly with things i often want to do (composer, close window)
+    - :q closes window just fine
 - does typing with vim keybinds actually make me noticeably faster?
 - if so, it's worth it to invest in
 - if not, fuck it

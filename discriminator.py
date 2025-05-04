@@ -138,7 +138,7 @@ def process_file(directory_path, filename, passed_dir="passed", failed_dir="fail
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test geometric constructions")
-    parser.add_argument("path", help="Path to construction file or directory")
+    parser.add_argument("--path", default="generated_constructions/", help="Path to construction file or directory")
     parser.add_argument("--verbosity", type=int, default=0, help="Print verbose output")
     parser.add_argument("--num_tests", type=int, default=20, help="Number of tests to run")
     parser.add_argument("--nomovefiles", action="store_false", dest="move_files", help="Don't move files to passed/ or failed/")

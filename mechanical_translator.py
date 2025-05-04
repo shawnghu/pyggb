@@ -96,6 +96,8 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
             futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
             for future in concurrent.futures.as_completed(futures):
                 problem_json_string = future.result()
+                if problem_json_string is None:
+                    continue
                 all_problem_json_strings.append(problem_json_string)
 
     with open(output_file, 'a') as f:
