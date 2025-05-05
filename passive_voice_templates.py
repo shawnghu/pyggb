@@ -24,10 +24,17 @@ def format_regular_command(command, idents: Dict[Element, str]):
             f"Point {output_labels[0]} lies on segment {input_labels[0]}.",
         ])
     if command.name == "point_pm":
-        return random.choice([
-            f"Point {output_labels[0]} is at distance {input_labels[1]} from point {input_labels[0]}.",
-            f"The distance from point {input_labels[0]} to point {output_labels[0]} is {input_labels[1]}.",
-        ])
+        existing_point = command.input_elements[0]
+        if existing_point.command.name == "point_":
+            return random.choice([
+                f"Let {input_labels[0]}{output_labels[0]} = {input_labels[1]}.",
+                f"{input_labels[0]}{output_labels[0]} = {input_labels[1]}.",
+            ])
+        else: 
+            return random.choice([
+                f"{output_labels[0]} is constructed so that {input_labels[0]}{output_labels[0]} = {input_labels[1]}.",
+                f"{output_labels[0]} is placed {input_labels[1]} away from {input_labels[0]}",
+            ])
     if command.name == "point_at_distance":
         return random.choice([
             f"Point {output_labels[0]} is at distance {input_labels[1]} from point {input_labels[0]}.",

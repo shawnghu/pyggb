@@ -4,6 +4,7 @@ __pycache__
 failed/
 .venv
 generated_constructions/
+natural_language_problems/
 passed/
 
 *.un~
