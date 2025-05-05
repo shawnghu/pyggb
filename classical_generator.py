@@ -1,4 +1,3 @@
-import functools
 import numpy as np
 np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import random
@@ -14,7 +13,7 @@ import commands
 import geo_types as gt
 from geo_types import MEASURABLE_TYPES, AngleSize
 from random_constr import Command, Element, ConstCommand
-from sample_config import get_commands
+from sample_config import get_commands, triangle_commands, polygon_commands, circle_commands, angle_commands 
 
 class Node:
     """A node in the dependency graph representing an Element."""
@@ -105,6 +104,7 @@ class ClassicalGenerator:
         
         # Get all available commands from the commands module
         self.available_commands = self._get_commands()
+        self.command_types = command_types
         if command_types:
             self.available_commands = {k: v for k, v in self.available_commands.items() if k in get_commands(command_types)}
 
@@ -113,16 +113,18 @@ class ClassicalGenerator:
         self.pruned_command_sequence: List[Command] = []
         self.made_polygon_already: bool = False
         self.made_triangle_already: bool = False
-        self.element_to_constructed_command: Dict[Element, Command] = {}
         # this has to exist because when we construct a polygon, the vertices and polygon are not naturally associated at the Element level.
         # the polygon is naturally aware of the vertices, but not necessarily of the Elements representing them, which is needed for the analysis done in this script.
         self.poly_to_vertices: Dict[Element, List[Element]] = {}
 
-        self.all_segments: Dict[gt.Segment, bool] = {}
+        self.all_lines: Dict[gt.Line, bool] = {} # includes segments, rays, and lines
+        self.all_points: Dict[gt.Point, bool] = {}
+        self.all_circles: Dict[gt.Circle, bool] = {}
+        self.all_triangles: Dict[gt.Triangle, bool] = {}
 
     def init_identifier_pool(self):
         self.identifier_pool = [chr(i) for i in range(65, 91)]  # A-Z
-        self.secondary_identifier_pool = [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 10)]  # A1-Z9
+        self.secondary_identifier_pool = [f"{chr(i)}{j}" for i in range(65, 91) for j in range(1, 100)]  # A1-Z99
         
     def _get_commands(self) -> Dict[str, Dict]:
         """Extract all commands from the commands module with their parameter and return types."""
@@ -153,9 +155,10 @@ class ClassicalGenerator:
             }
         return commands_dict
 
-    def _get_unused_identifier(self, return_sequential: int = 0) -> str:
+    def _get_unused_identifier(self, hidden: bool = False, return_sequential: int = 0) -> str:
         """Get an unused identifier from the pool."""
-        id_pool = self.identifier_pool if self.identifier_pool and len(self.identifier_pool) > return_sequential else self.secondary_identifier_pool
+        # arg hidden: use the secondary pool, because this ident is going to be missing from the translation anyway and we need to conserve good idents
+        id_pool = self.identifier_pool if self.identifier_pool and len(self.identifier_pool) > return_sequential and not hidden else self.secondary_identifier_pool
         if return_sequential > 0 and len(id_pool) > return_sequential:
             identifier = id_pool.pop(0) # the next time we call this function, we will, by construction, get the next index
         else:
@@ -191,7 +194,7 @@ class ClassicalGenerator:
                     break
                 
         # First try to find existing compatible elements
-        for identifier, element in self.identifiers.items():
+        for element in self.identifiers.values():
             actual_type = type(element.data)
             if self._is_compatible_type(actual_type, required_type):
                 compatible.append(element)
@@ -268,17 +271,45 @@ class ClassicalGenerator:
         if label_factory is None:
             label_factory = self._get_unused_identifier
         try:
-            if cmd_name == 'segment_pp' or cmd_name == 'diagonal_p':
-                if (input_elements[0], input_elements[1]) in self.all_segments:
-                    return False, None
             command = Command(cmd_name, input_elements, label_factory=label_factory, label_dict=self.identifiers)
             command.apply()
-
+            failed_command = False
+            for output_elem in command.output_elements:
+                try:
+                    if isinstance(output_elem.data, gt.Line):
+                        key = (tuple(output_elem.data.n), output_elem.data.c)
+                        if key in self.all_lines: # don't make two overlapping lines
+                            break
+                        self.all_lines[key] = True
+                    if isinstance(output_elem.data, gt.Point):
+                        key = tuple(output_elem.data.a)
+                        if key in self.all_points:
+                            failed_command = True
+                            break
+                        self.all_points[key] = True
+                    if isinstance(output_elem.data, gt.Circle):
+                        key = (tuple(output_elem.data.c), output_elem.data.r)
+                        if key in self.all_circles:
+                            failed_command = True
+                            break
+                        self.all_circles[key] = True
+                    if isinstance(output_elem.data, gt.Triangle):
+                        key = tuple(sorted((output_elem.data.a, output_elem.data.b, output_elem.data.c), key=lambda x: x.__repr__())) # sort by string representation to make the key invariant to the order of the points
+                        if key in self.all_triangles:
+                            failed_command = True
+                            break
+                        self.all_triangles[key] = True
+                except Exception as e:
+                    print('error: ', e)
+                    pdb.set_trace()
+            if failed_command:
+                for output_elem in command.output_elements:
+                    # undo the command, which here means we don't keep track of the elements it generated
+                    if output_elem.label in self.identifiers:
+                        del self.identifiers[output_elem.label]
+                return False, None
             if 'rotate_polygon' in cmd_name or cmd_name == 'polygon_from_center_and_circumradius':
                 self.poly_to_vertices[command.output_elements[-1]] = command.output_elements[:-1]
-            if cmd_name == 'diagonal_p' or cmd_name == 'segment_pp':
-                self.all_segments[(command.input_elements[0], command.input_elements[1])] = True
-                self.all_segments[(command.input_elements[1], command.input_elements[0])] = True
             return True, command
         except Exception as e:
             return False, None
@@ -312,9 +343,16 @@ class ClassicalGenerator:
             if cmd_name == 'area_P':
                 continue
 
+            # just don't sample more than one point, since it can lead to more degenerate problems
+            if cmd_name == 'point_':
+                continue
             
             cmd_info = self.available_commands[cmd_name]
             if cmd_info['return_type'] == gt.Boolean:
+                continue
+
+
+            if cmd_name == 'point_pm' and len(self.command_sequence) > 10:
                 continue
             # decrease frequency of polygons
             if cmd_name == 'polygon_from_center_and_circumradius':
@@ -344,15 +382,6 @@ class ClassicalGenerator:
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
 
-            # Special case for point_ with no parameters
-            # note: not sure this was necessary. i think other param logic is generic enough for this
-            if cmd_name == 'point_' and len(param_types) == 0:
-                # Try to execute the command directly
-                success, command = self._try_apply_command(cmd_name, [])
-                if success:
-                    return command
-                else:
-                    continue
             num_points = len([x for x in self.identifiers.values() if isinstance(x.data, gt.Point)])
             if cmd_name == 'triangle_ppp':
                 if (num_points <= 2):
@@ -363,10 +392,6 @@ class ClassicalGenerator:
                         continue
                 else:
                     self.made_triangle_already = True
-
-            # Skip commands that need parameters if we don't have any elements yet
-            if not self.identifiers and param_types and not all(t in (int, float) for t in param_types):
-                continue
             
             # Try to find compatible parameters for the sampled command, ensuring they are unique
             valid_params = True
@@ -422,8 +447,9 @@ class ClassicalGenerator:
                     return command
                 else:
                     continue
-        # we should never get here
-        raise Exception("Somehow ran out of commands???")
+        # this actually can happen now, since we can get unlucky and when we sample a valid command, sample the wrong args for the command, thereby skipping it.
+        return None
+
 
     def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
@@ -447,7 +473,6 @@ class ClassicalGenerator:
         Find the measurable quantity with the most ancestors and create a pruned
         construction sequence that includes only the commands needed to construct it.
         """
-            
         # Find all measurable quantities
         measurable_nodes = []
         for label, node in self.dependency_graph.nodes.items():
@@ -455,14 +480,28 @@ class ClassicalGenerator:
             # Check if the element's data is a measurable type
             if any(isinstance(element.data, m_type) for m_type in MEASURABLE_TYPES):
                 measurable_nodes.append(node)
-        
-        if not measurable_nodes:
-            # If no measurable quantities found, keep the original sequence
-            self.pruned_command_sequence = self.command_sequence.copy()
-            return
-            
-        # Find the measurable quantity with the most ancestors
-        target_node = max(measurable_nodes, key=lambda node: node.ancestor_count)
+        while True:
+            if not measurable_nodes:
+                # If no measurable quantities found, keep the original sequence
+                self.pruned_command_sequence = self.command_sequence.copy()
+                return False
+            # Find the measurable quantity with the most ancestors
+            target_node = max(measurable_nodes, key=lambda node: node.ancestor_count)
+            if target_node.command.name == 'radius_c':
+                radius_command = target_node.command
+                radius_found_by = radius_command.input_elements[0].command.name
+                if radius_found_by == 'circle_pp' or radius_found_by == 'circle_pm':
+                    # degenerate construction, we started with the radius, contructed a circle, and then measured the radius.
+                    measurable_nodes.remove(target_node)
+                    continue
+            if target_node.command.name == 'distance_pp' or target_node.command.name == 'segment_pp':
+                dist_names = ('point_pm', 'point_at_distance_along_line')
+                if target_node.command.input_elements[0].command.name in dist_names or target_node.command.input_elements[1].command.name in dist_names:
+                    # degenerate construction, we started with the distance, constructed a point, and then measured the distance.
+                    # strictly speaking we need to check that the other arg is the other point in distance_pp, but i don't care, we can throw away some extras.
+                    measurable_nodes.remove(target_node)
+                    continue
+            break
         
         # Collect all commands needed for this node using DFS   
         required_commands = set()  # Use a set to avoid duplicates
@@ -488,27 +527,26 @@ class ClassicalGenerator:
         # Convert to list and sort by original command order
         command_order = {cmd: i for i, cmd in enumerate(self.command_sequence)}
         ordered_commands = sorted(required_commands, key=lambda cmd: command_order.get(cmd, float('inf')))
-        
+
         # Add a measure command for the target node
         # Create a new measure command for the target element
-        measure_command = Command('measure', [target_node.element], label_factory=self._get_unused_identifier, label_dict=self.identifiers)
+        measure_command = Command('measure', [target_node.element])
         measure_command.apply()
         self._update_dependency_graph(measure_command)
         ordered_commands.append(measure_command)        
 
-
-
         # reassign identifiers starting from the beginning of the ident pool (shuffled, but with single char idents first),
         # so that the output is more readable
+        # NOTE: this means all ident logic applied before here is useless
         # a funny thing happened here:
         # you don't have to rename the input elements, because the semantics of the rest of this program involve manipulating actual element objects.
         # so when you rename the output elements, you will rename every element which is actually used in the command sequence,
         # and the element object will be updated, passed around, and have the correct label when it is used as an input element.
         # in fact, trying to rename the input element will fail, because it has already been renamed.
-        self.init_identifier_pool() # this effectively destroys all ability to assign idents later, so we have to be sure that this is one of the last things we ever do with this generator.
+        self.init_identifier_pool()
         for command in ordered_commands:
             if isinstance(command, ConstCommand):
-                command.element.label = self._get_unused_identifier()
+                command.element.label = self._get_unused_identifier(hidden=True)
                 continue
             if command.name == 'polygon_from_center_and_circumradius':
                 num_sides = command.input_elements[0].data
@@ -522,9 +560,35 @@ class ClassicalGenerator:
                     output_elem.label = input_vertex.label + "'"
                 command.output_elements[-1].label = command.input_elements[0].label + "'"
             else:
+                ident_will_be_hidden = False
+                if command.name in ('segment_pp', 'angle_ppp', 'triangle_ppp', 'diagonal_p'):
+                    ident_will_be_hidden = True
                 for output_elem in command.output_elements:
-                    output_elem.label = self._get_unused_identifier()
+                    output_elem.label = self._get_unused_identifier(hidden=ident_will_be_hidden)
 
+        if len(ordered_commands) < 6: # often so short as to be degenerate or uninteresting
+            return False
+
+        # we still need to check for this, because in principle we could always just construct something with only basic commands.
+        if 'all' not in self.command_types:
+            required_interesting_commands = []
+            if 'triangle' in self.command_types:
+                required_interesting_commands.extend(triangle_commands)
+            if 'polygon' in self.command_types:
+                required_interesting_commands.extend(polygon_commands)
+            if 'circle' in self.command_types:
+                required_interesting_commands.extend(circle_commands)
+            if 'angle' in self.command_types:
+                required_interesting_commands.extend(angle_commands)
+            found = False
+            for cmd in ordered_commands:
+                if isinstance(cmd, ConstCommand):
+                    continue
+                if cmd.name in required_interesting_commands:
+                    found = True
+                    break
+            if not found:
+                return False
         self.pruned_command_sequence = ordered_commands
         return True
 
@@ -560,7 +624,7 @@ def parse_args():
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
     parser.add_argument("--multiprocess", action="store_true", help="use multiprocessing")
-    parser.add_argument("--command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "angle", "all"], 
+    parser.add_argument("--command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "angle", "all"], default=["all"],
                         help="Types of geometric commands to include")
     # parser.add_argument("--generator", type=str, default="ClassicalGenerator", help="Generator to use")
     args = parser.parse_args()

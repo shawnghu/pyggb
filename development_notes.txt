@@ -1,12 +1,37 @@
+where i am now:
+[x] just solved a problem with the generator throwing in the middle of commands, causing incorrect stuff to be reconstructed
+[x] need to solve discriminator still throws errors due to keyerror due to sometimes ill-constructed command files
+    [x] solved
+
+(should have done some unit testing?)
+(more like instead of writing tests, should just make more atomic changes)
+(also should do things more breadth-first
+
+
 cursor hotkeys:
     - bash: ctrl-y to paste. ctrl-/ to under
-    - focus chat hotkey?
+    - focus chat hotkey? ctrl-y taken by bash
+vim keys:
+    - see :help g
+    - ge to get to end of previous word
+    - gi to edit at last edit position
+    - what is visualstar?
+    - https://filiphalas.com/keyboard-controlled-vscode-with-vim-and-tmux
+        - see tmux, sneak, etc. settings, substitution, surround
+    - C-d now does something weird ('visual multi-cursor') that doesn't work with a correctly
 
+- fixed translation errors:
+    - arg order in mirror commands
+    - unhandled triangle retvals for the new segments
+
+[x] solve ident stuff (too many idents)
 
 - high level agenda:
 - fix (some of) the dumb things
 [x] do restricted problem generation
 - fix dumb things in iteration if needed
+    [x] ban making more than one point that is just floating
+    [x] ban making point at fixed distance from another point after too long
 - add more commands(?)
     - build triangle by fiat (return the points)
         - equilateral triangle
@@ -18,17 +43,23 @@ cursor hotkeys:
     - externally tangent circle
     - circle tangent to two others? (has the problem of always returning two circles if they are externally tangent. but can do a randomizer.)
     - triangle area
+- need to create simple script to analyze problem output distribution
+- need to grade problems by the 100s to see output difficulty distribution
+- visualize problems
 
 
 list of dumb things:
-- segment of fixed length is constructed, circle constructed with that as radius, we ask for the radius of the circle instead of just the length of the segment
-    - now circles can't be constructed with segment, only by two points, three points, or radius directly
-    - it's still possible to do dumb things like construct a circle with two points then ask for the radius, which is just the same as asking for the dist between the points.
-- likewise, it's possible to construct two points at a fixed distance and then just ask for the distance between those two points, which is kind of dumb.
-    - note fundamentally there are only like three kinds of measures: distance, angle, area (special triangle ops like circumradius, inradius). and area is not really possible for anything other than a triangle because areas of regular polygons are boring and irregular polygons can't be reliably constructed. 
+- point_at_distance_along_line actually is very important, so we need to fix its ambiguity
+[x] lines could be constructed on top of each other, points, circles
+[x] segment of fixed length is constructed, circle constructed with that as radius, we ask for the radius of the circle instead of just the length of the segment
+    [x] now circles can't be constructed with segment, only by two points, three points, or radius directly
+    [x] it's still possible to do dumb things like construct a circle with two points then ask for the radius, which is just the same as asking for the dist between the points. (filter constructions by conditions on the measured variable)
+[x] likewise, it's possible to construct two points at a fixed distance and then just ask for the distance between those two points, which is kind of dumb.
+    [x] note fundamentally there are only like three kinds of measures: distance, angle, area (special triangle ops like circumradius, inradius). and area is not really possible for anything other than a triangle because areas of regular polygons are boring and irregular polygons can't be reliably constructed. 
         [x] handled in translator measure type
         - it will be good to add "ratio".
-    [x] special casing for regular polygons
+            - will not do. too hard for too little reward
+    [x] special casing for regular polygon translation
 
 translations:
 - a point constructed at a fixed distance from another point is just called a segment, so do that
@@ -36,10 +67,6 @@ translations:
 
 - distribution of problems. Triangles can be constructed more easily. Somehow still too many polygons are constructed
 
-- currently we only have lines, triangles, circles, and regular polygons. what else?
-
-- need to create problem sampling logic
-- need to create sample distribution script
 
 sampling:
 -square 

@@ -240,6 +240,8 @@ class Triangle:
         self.a = a
         self.b = b
         self.c = c
+        self.segments = [Segment(a, b), Segment(b, c), Segment(c, a)]
+        self.points = [a, b, c] # for area_P
         assert(not np.isclose(self.a.a, self.b.a).all())
         assert(not np.isclose(self.b.a, self.c.a).all())
         assert(not np.isclose(self.c.a, self.a.a).all())
@@ -411,7 +413,7 @@ MEASURABLE_TYPES = (
     # Numeric types
     Measure, # no good reason to directly measure float/int/anglesize bcause they only arise when we construct them directly
     # Geometric types with direct numeric value
-    Angle, Segment, Polygon
+    Angle, Segment, Polygon, Triangle
     # Remove Boolean because it makes boring constructions
     # Boolean
 )

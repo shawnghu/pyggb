@@ -116,8 +116,7 @@ def invert_pi_expression(value):
     elif abs(value - 11 * math.pi / 12) < 1e-4:
         return "11pi/12"
     else:
-        return str(value)
-
+        return "%0.6f" % value
 
 @dataclass
 class Command:

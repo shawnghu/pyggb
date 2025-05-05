@@ -102,6 +102,8 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
 
     with open(output_file, 'a') as f:
         for problem_json_string in all_problem_json_strings:
+            if problem_json_string is None:
+                continue
             f.write(problem_json_string + "\n")
 
     print (f"Wrote {len(all_problem_json_strings)} translations to: {output_file}")

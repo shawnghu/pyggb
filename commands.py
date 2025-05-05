@@ -507,6 +507,7 @@ def measure(x: Any) -> Any:
     """
     return x
 
+
 def point_at_distance_along_line(line: gt.Line, reference_point: gt.Point, distance: float) -> gt.Point:
     """Create a point on a line at a specified distance from the closest point on the line to a reference point."""
     # Project reference point onto the line
@@ -525,10 +526,9 @@ def circumcircle_p(p: gt.Polygon) -> gt.Circle:
     return gt.Circle(p.center, np.linalg.norm(p.points[0].a - p.center.a))
 
 
-def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> gt.Triangle:
-    'contained_by_pc',
-    'contained_by_pl',
-    return gt.Triangle(p1, p2, p3)
+def triangle_ppp(p1: gt.Point, p2: gt.Point, p3: gt.Point) -> Tuple[gt.Triangle, gt.Segment, gt.Segment, gt.Segment]:
+    triangle = gt.Triangle(p1, p2, p3)
+    return triangle, *triangle.segments
 
 def circumcircle_t(t: gt.Triangle) -> gt.Circle:
     return circle_ppp(t.a, t.b, t.c)

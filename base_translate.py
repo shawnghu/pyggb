@@ -82,6 +82,9 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
             continue
         if command.name == "triangle_ppp":
             idents[command.output_elements[0]] = command.input_elements[0].label + command.input_elements[1].label + command.input_elements[2].label
+            idents[command.output_elements[1]] = command.input_elements[0].label + command.input_elements[1].label
+            idents[command.output_elements[2]] = command.input_elements[1].label + command.input_elements[2].label
+            idents[command.output_elements[3]] = command.input_elements[2].label + command.input_elements[0].label
             continue
         if command.name == "diagonal_p":
             idents[command.output_elements[0]] = command.input_elements[0].label + command.input_elements[1].label
@@ -130,6 +133,12 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
             f"Find the length of segment {measured_object}."
         ]
         stats["measure_type"] = "distance"
+    elif "triangle" in generating_command.name:
+        measure_templates = [
+            f"What is the area of triangle {measured_object}?",
+            f"Find the area of triangle {measured_object}."
+        ]
+        stats["measure_type"] = "area"
     # in the following cases, we are actually measuring a Measure that was constructed by the previous command
     elif generating_command.name in ("distance_pp", "radius_c", "circumradius_t", "area_P", "inradius_t"):
         last_line_inputs = [idents[x] if x in idents else x.label for x in generating_command.input_elements]

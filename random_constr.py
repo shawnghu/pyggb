@@ -1,4 +1,5 @@
 import os, pdb
+from typing import Optional
 from geo_types import *
 import math
 
@@ -28,12 +29,15 @@ from inspect import getmembers, isfunction
 command_dict = dict(o for o in getmembers(commands_module) if isfunction(o[1]))
 
 class Element:
-    def __init__(self, label, element_dict):
+    def __init__(self, label=None, element_dict=None):
+        if isinstance(label, dict):
+            raise ValueError("Label is a dict, you meant to pass that as element_dict")
         self.data = None
         self.label = label
         self.command = None 
-        assert(label not in element_dict)
-        element_dict[label] = self
+        if label is not None and element_dict is not None:
+            assert(label not in element_dict)
+            element_dict[label] = self
 
     def drawable(self):
         return isinstance(self.data, (Point, Line, Angle, Polygon, Circle, Vector))
@@ -58,6 +62,8 @@ class Element:
         elif isinstance(self.data, Segment): 
             return self.data.length
         elif isinstance(self.data, Polygon): 
+            return commands_module.area_P(self.data).x
+        elif isinstance(self.data, Triangle): 
             return commands_module.area_P(self.data).x
         elif isinstance(self.data, Circle):
             return self.data.r  # Measure circle radius
@@ -89,12 +95,11 @@ class Command:
                 if o is not None:
                     o.data = x
         else:
-            if self.label_factory:
-                self.output_elements = [Element(self.label_factory(), self.label_dict) for _ in range(len(output_data))]
-                for x,o in zip(output_data, self.output_elements):
-                    o.data = x
-            else:
-                raise ValueError("No label factory and no output elements for command: {}".format(self.name))
+            label = self.label_factory() if self.label_factory else None
+            self.output_elements = [Element(label, self.label_dict) for _ in range(len(output_data))]
+            for x,o in zip(output_data, self.output_elements):
+                o.data = x
+                o.command = self
 
     def __repr__(self):
         inputs_str = ' '.join([x.label for x in self.input_elements])
@@ -137,7 +142,7 @@ def parse_command(line, element_dict):
         value = float(tokens[2])
         assert(tokens[3] == "->")
         label = tokens[4]
-        element = Element(label, element_dict)
+        element = Element(label, element_dict=element_dict)
         command = ConstCommand(datatype, value, element)
         element.command = command
         return command
@@ -145,13 +150,15 @@ def parse_command(line, element_dict):
         command_name = tokens[0]
         assert(tokens[1] == ":")
         labels = [None if token == "_" else token for token in tokens[2:]]
+        # Filter out any None values that might have been created from extra spaces
+        labels = [label for label in labels if label is not None]
         arrow_index = labels.index("->")
         input_labels = labels[:arrow_index]
         output_labels = labels[arrow_index+1:]
         input_elements = [element_dict[label] for label in input_labels]
         def element_or_none(label):
             if label is None: return None
-            else: return Element(label, element_dict)
+            else: return Element(label, element_dict=element_dict)
         output_elements = list(map(element_or_none, output_labels))
         command = Command(command_name, input_elements, output_elements)
         for el in output_elements:
@@ -164,8 +171,8 @@ class Construction:
         self.min_border = min_border
         self.max_border = max_border
         self.nc_commands = []
-        self.to_prove = None
-        self.to_measure = None
+        self.to_prove: Optional[Element] = None
+        self.to_measure: Optional[Element] = None
         self.statement_type = None  # "prove" or "measure"
         self.element_dict = dict()
         self.elements = []

@@ -211,8 +211,9 @@ def main(args):
                         print(f"Error processing {filename}: {e}")
                         num_errors += 1
 
-        answers_path = os.path.join(passed_dir, "answers.txt")
-        with open(answers_path, 'a') as f:
+        if args.move_files:
+            answers_path = os.path.join(passed_dir, "answers.txt")
+            with open(answers_path, 'a') as f:
                 for answer in all_answers:
                     f.write(f"{answer}\n")
         print(f"\nSummary: {num_passed} passed, {num_failed} failed, {num_errors} errors")
