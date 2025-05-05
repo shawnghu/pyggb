@@ -19,15 +19,19 @@ openthinker_model_name = "open-thoughts/OpenThinker-32B"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", type=str)
-    parser.add_argument("--model_shortname", type=str, default="qwen")
+    parser.add_argument("--model_shortname", type=str, default="both")
     parser.add_argument("--grade_all_problems", action="store_true")
     parser.add_argument("--num_trials", type=int, default=10)
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
     parser.add_argument("--pipeline_parallel_size", type=int, default=1)
     args = parser.parse_args()
-    main_with_args(args)
-    args.model_shortname = "openthinker"
-    main_with_args(args)
+    if args.model_shortname == "both":
+        args.model_shortname = "qwen"
+        main_with_args(args)
+        args.model_shortname = "openthinker"
+        main_with_args(args)
+    else:
+        main_with_args(args)
 
 def main_with_args(args):
     if args.model_shortname == "qwen":

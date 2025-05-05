@@ -1,49 +1,59 @@
 # "Geometry construction" dataset builder
 
+## Just make problems
+`python pipeline.py --count 100000 --generator_class ClassicalGenerator --num_generator_commands 50 --multiprocess`
+
+Output file is a .jsonl containing a problem, an answer in decimal to four decimal places, and various problem metadata.
+
+## Make problems with specific properties
+add arg e.g, `--generator_command_types triangle` to the above command
+
+for options, see classical_generator.py's `parse_args()`. currently they are `basic`, `triangle`, `circle`, `polygon`, `angle`, `all`.
+
+to see which commands are in each category, see sample_config.py.
+
+## Grade problems
+
+`python grader.py <file_that_was_output_by_pipeline>`
+
+Grader takes about an hour to grade 1000 problems with qwen, 10 times as long for openthinker (since it's a reasoning model).
+
+To speed things up with multiple GPUs try something like
+`CUDA_VISIBLE_DEVICES=0,1,2,3 python grader.py --tensor_parallel_size 4 <file_that_was_output_by_pipeline>`
+
+Tensor parallel size must be smaller than the number of GPUs and also a power of 2, so it's usually 4.
+
+Output is a .jsonl in the same directory with an extension to the basename, and a field is added indicating the model's score on the problem and a tentative rating.
+
+
+Notes:
+- Above, 100000 is the number of problems that will attempt generation. Many of them will be discarded as invalid, and the success rate is between 1 and 5%, so this will only produce a few thousand valid problems.
+- Likewise, 50 is the number of commands that the generator will complete, but not all of them will be used in the final problem. This is likely to produce a problem between 5 and 15 commands long.
+- Due to the randomly generative nature of this repo, there is not a clear way to produce problems of a given difficulty, instead, we have to filter the questions by difficulty after grading. The only proxy for difficulty we have control over is the problem length (num_generator_commands).
+
+
+
+
 ## Pipeline
 
-- deprecated: generator.py (same as classical_generator.py, but uses gpt-4.1-mini instead of this approach)
 - classical_generator.py: make candidate construction files -> generated_constructions
 - check_construction_files.py: analysis / statistics of generated files, to try to make a better generator
-- measure_test.py: attempt to construct the files; filter for the ones that encode legitimate constructions and compute the answers -> passed/, failed/ (40% success rate)
-- translate_to_nl.py: translate the files in passed/ to natural language -> natural_language_problems/
-- validator.py: quality check the natural language problems by just cross-checking with o4-mini (-> output.jsonl):  (90% success rate)
+- measure_test.py: attempt to construct the files; filter for the ones that encode legitimate constructions and compute the answers -> passed/, failed/ 
+- mechanical_translator.py: translate the files in passed/ to natural language -> natural_language_problems/
 - grader.py: grade problems by difficulty (-> graded.jsonl)
     - works with vLLM with tensor parallelism, so best done on a huge server with a bunch of high-memory GPUs
     - grader_serial.py will work with a single GPU or even CPU, but is up to 100x slower (even assuming you have one gpu that fits a 32b model in memory)
 
-## Summary of pipeline performance/decisions:
-- overall estimate a 1/3 success rate end to end, loosely assume that candidate construction files are 1000 tokens, input prompt is 10000 tokens for 100 constructions
-- translation to natural language problems is maybe 3000 toke
-ns, but happens on only semantically valid constructions, so 1000 tokens per construction
-- validator uses a reasoning model, so maybe 30000 tokens, or 10000 per initial construction, but is on o4-mini, which is 
-- assume grader is free, which may not really be true because it can use like 6kW electricity
-
-
--> using current scheme with 4.1-mini for generation/translation, and o4-mini for validation, 10-15 cents per valid problem
--> of 89 generated problems, 65 were easy (qwen answered at least 4/5 correct), 7 were medium (openthinker answered at least 4/5 correct), 9 were "above-medium" (openthinker answered at least 1/5 correct), 0 were "probably-hard" (openthinker answered less than 1/5 correct)
-
-- this approach may not scale cost-effectively to harder or longer problems, since probability of successful construction goes down as the problem gets longer, so try "classical" generator approach (see below).
-- note that these statistics imply openthinker perhaps isn't better than qwen on these problems
-
 
 
 ## Other core files (inherited from pyggb repo)
-- ggb_expr and other geogebra-related files are not used here.
 - geo_types.py: defines the types, naturally:
 - commands.py: defines the command language that these files are written in.
-- random_constr.py: example file, which existed in the old repo. "proves" validity of constructions by repeating them with different random seeds and seeing if they always agree.
+- random_constr.py: defines constructions. existed in the old repo. example "proves" validity of constructions by repeating them with different random seeds and seeing if they always agree.
+
+- ggb_expr and other geogebra-related files are not used here.
 
 
-## Model selection considerations and tricks for problem generation
-Currently the generator uses gpt-4.1-mini, and at time of writing has approximately a 40% success rate at at least making a file with a valid construction. More powerful models do not have an appreciably higher success rate and are costlier and slower to generate. gpt-4.1-nano has a 2-5% success rate, so is mostly not feasible for use.
-
-There seems to be no major advantage to asking the model to generate such files 10 at a time vs 100 at a time, so do the latter.
-
-## Ways of improving the pipeline at various points
-
-- Simple improvements to the prompt or command language may make the generator likelier to make valid files, but I already picked the low hanging fruit here. Mostly the model is making syntactically valid files, and it is a much higher bar to expect it to make semantically valid ones (at comparable cost).
-- Likewise, I am not sure how to improve the rate of natural language translation. It seems like unavoidably, some of the constructions are for pretty stupid problems, and the model "helpfully" translates them into more reasonable questions, which then do not match the original construction. Filtering with 4.1 is already relatively cheap, though.
 
 
 ## Alternate generator approach:

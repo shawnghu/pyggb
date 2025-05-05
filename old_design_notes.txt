@@ -1,0 +1,18 @@
+# This contains ideas that were used in previous versions of the pipeline
+
+## Model selection considerations and tricks for problem generation
+## Summary of pipeline performance/decisions:
+- overall estimate a 1/3 success rate end to end, loosely assume that candidate construction files are 1000 tokens, input prompt is 10000 tokens for 100 constructions
+- translation to natural language problems is maybe 3000 toke
+ns, but happens on only semantically valid constructions, so 1000 tokens per construction
+- validator uses a reasoning model, so maybe 30000 tokens, or 10000 per initial construction, but is on o4-mini, which is 
+- assume grader is free, which may not really be true because it can use like 6kW electricity
+
+Currently the generator uses gpt-4.1-mini, and at time of writing has approximately a 40% success rate at at least making a file with a valid construction. More powerful models do not have an appreciably higher success rate and are costlier and slower to generate. gpt-4.1-nano has a 2-5% success rate, so is mostly not feasible for use.
+
+There seems to be no major advantage to asking the model to generate such files 10 at a time vs 100 at a time, so do the latter.
+
+## Ways of improving the pipeline at various points
+
+- Simple improvements to the prompt or command language may make the generator likelier to make valid files, but I already picked the low hanging fruit here. Mostly the model is making syntactically valid files, and it is a much higher bar to expect it to make semantically valid ones (at comparable cost).
+- Likewise, I am not sure how to improve the rate of natural language translation. It seems like unavoidably, some of the constructions are for pretty stupid problems, and the model "helpfully" translates them into more reasonable questions, which then do not match the original construction. Filtering with 4.1 is already relatively cheap, though.
