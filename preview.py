@@ -1,3 +1,4 @@
+import argparse
 import os
 import gi
 gi.require_version("Gtk", "3.0")
@@ -67,6 +68,13 @@ class DisplayWindow(Gtk.Window):
             self.construction.generate(max_attempts = 0)
             self.darea.queue_draw()
 
-if __name__ == "__main__":
-    DisplayWindow(400, 300, "ggb-benchmark/true")
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("datadir", type=str)
+    args = parser.parse_args()
+    DisplayWindow(400, 300, args.datadir)
     Gtk.main()
+
+if __name__ == "__main__":
+    main()
