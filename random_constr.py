@@ -29,15 +29,16 @@ from inspect import getmembers, isfunction
 command_dict = dict(o for o in getmembers(commands_module) if isfunction(o[1]))
 
 class Element:
-    def __init__(self, label=None, element_dict=None):
+    def __init__(self, label, element_dict):
         if isinstance(label, dict):
             raise ValueError("Label is a dict, you meant to pass that as element_dict")
         self.data = None
         self.label = label
         self.command = None 
-        if label is not None and element_dict is not None:
-            assert(label not in element_dict)
-            element_dict[label] = self
+        if element_dict is None:
+            pdb.set_trace()
+        assert(label not in element_dict)
+        element_dict[label] = self
 
     def drawable(self):
         return isinstance(self.data, (Point, Line, Angle, Polygon, Circle, Vector))
@@ -90,16 +91,19 @@ class Command:
         if not isinstance(output_data, (tuple, list)):
             output_data = (output_data,)
         if self.output_elements:
+            if len(output_data) != len(self.output_elements):
+                pdb.set_trace()
             assert(len(output_data) == len(self.output_elements))
             for x,o in zip(output_data, self.output_elements):
                 if o is not None:
                     o.data = x
         else:
-            label = self.label_factory() if self.label_factory else None
-            self.output_elements = [Element(label, self.label_dict) for _ in range(len(output_data))]
-            for x,o in zip(output_data, self.output_elements):
-                o.data = x
-                o.command = self
+            self.output_elements = []
+            for datum in output_data:
+                label = self.label_factory() if self.label_factory else None
+                self.output_elements.append(Element(label, self.label_dict))
+                self.output_elements[-1].data = datum
+                self.output_elements[-1].command = self
 
     def __repr__(self):
         inputs_str = ' '.join([x.label for x in self.input_elements])

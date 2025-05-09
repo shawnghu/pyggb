@@ -1,3 +1,4 @@
+import traceback
 import numpy as np
 np.seterr(all='raise') # RuntimeWarnings like divide by zero, degenerate determinants, etc. will now raise exceptions, invalidating some constructions.
 import random
@@ -290,7 +291,6 @@ class ClassicalGenerator:
                     if isinstance(output_elem.data, gt.Circle):
                         key = (tuple(output_elem.data.c), output_elem.data.r)
                         if key in self.all_circles:
-                            failed_command = True
                             break
                         self.all_circles[key] = True
                     if isinstance(output_elem.data, gt.Triangle):
@@ -300,8 +300,8 @@ class ClassicalGenerator:
                             break
                         self.all_triangles[key] = True
                 except Exception as e:
-                    print('error: ', e)
-                    pdb.set_trace()
+                    # traceback.print_exc()
+                    pdb.set_trace() # this one really isn't supposed to happen
             if failed_command:
                 for output_elem in command.output_elements:
                     # undo the command, which here means we don't keep track of the elements it generated
@@ -310,8 +310,11 @@ class ClassicalGenerator:
                 return False, None
             if 'rotate_polygon' in cmd_name or cmd_name == 'polygon_from_center_and_circumradius':
                 self.poly_to_vertices[command.output_elements[-1]] = command.output_elements[:-1]
+            if cmd_name == 'triangle_ppp':
+                self.made_triangle_already = True
             return True, command
         except Exception as e:
+            # traceback.print_exc()
             return False, None
 
     def _sample_commands(self) -> Generator[str, None, None]:
@@ -382,17 +385,6 @@ class ClassicalGenerator:
             cmd_info = self.available_commands[cmd_name]
             param_types = cmd_info['param_types']
 
-            num_points = len([x for x in self.identifiers.values() if isinstance(x.data, gt.Point)])
-            if cmd_name == 'triangle_ppp':
-                if (num_points <= 2):
-                    success, command = self._try_apply_command('point_', [])
-                    if success:
-                        return command
-                    else:
-                        continue
-                else:
-                    self.made_triangle_already = True
-            
             # Try to find compatible parameters for the sampled command, ensuring they are unique
             valid_params = True
             if cmd_name == 'diagonal_p':
@@ -502,7 +494,6 @@ class ClassicalGenerator:
                     measurable_nodes.remove(target_node)
                     continue
             break
-        
         # Collect all commands needed for this node using DFS   
         required_commands = set()  # Use a set to avoid duplicates
         visited = set()
@@ -530,7 +521,7 @@ class ClassicalGenerator:
 
         # Add a measure command for the target node
         # Create a new measure command for the target element
-        measure_command = Command('measure', [target_node.element])
+        measure_command = Command('measure', [target_node.element], label_dict=self.identifiers)
         measure_command.apply()
         self._update_dependency_graph(measure_command)
         ordered_commands.append(measure_command)        
@@ -565,12 +556,11 @@ class ClassicalGenerator:
                     ident_will_be_hidden = True
                 for output_elem in command.output_elements:
                     output_elem.label = self._get_unused_identifier(hidden=ident_will_be_hidden)
-
         if len(ordered_commands) < 6: # often so short as to be degenerate or uninteresting
             return False
 
         # we still need to check for this, because in principle we could always just construct something with only basic commands.
-        if 'all' not in self.command_types:
+        if 'all' not in self.command_types and self.command_types != ['basic']:
             required_interesting_commands = []
             if 'triangle' in self.command_types:
                 required_interesting_commands.extend(triangle_commands)

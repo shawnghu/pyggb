@@ -8,12 +8,63 @@ from validator import extract_last_float, isclose, floatify
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import copy
 import pdb
+from openai import OpenAI
 from vllm import LLM, SamplingParams
 # from vllm.engine.arg_utils import HfOverrides
 
 qwen_model_name = "Qwen/Qwen2.5-32B-Instruct"
 openthinker_model_name = "open-thoughts/OpenThinker-32B"
 
+def do_inference_in_server(client, model_name, prompts):
+
+    outputs = []
+    import concurrent.futures
+    
+    def process_prompt(prompt, client, model_name):
+        completion = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return completion.choices[0].message.content
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
+        # Submit all prompts to the thread pool
+        future_to_prompt = {
+            executor.submit(process_prompt, prompt, client, model_name): prompt 
+            for prompt in prompts
+        }
+        
+        # this doesn't work because it doesn't maintain order
+        for future in concurrent.futures.as_completed(future_to_prompt.keys()):
+            outputs.append(future.result())
+    return outputs
+
+def do_inference_in_process(args, model_name, prompts):
+    hf_overrides = {
+        "use_cache": True
+    }
+    # Load model with vLLM - uses tensor parallelism automatically
+    llm = LLM(
+        model=model_name,
+        tensor_parallel_size=args.tensor_parallel_size,
+        pipeline_parallel_size=args.pipeline_parallel_size,
+        trust_remote_code=False,
+        dtype="float16",
+        hf_overrides=hf_overrides,
+        # enable_chunked_prefill=True,
+        # max_num_batched_tokens=8192,
+    )
+    # Configure sampling parameters
+    sampling_params = SamplingParams(
+        temperature=0.7,
+        top_p=0.9,
+        max_tokens=10000
+    )
+    
+    outputs = llm.generate(prompts, sampling_params)
+    return outputs
 
 
 def main():
@@ -24,6 +75,7 @@ def main():
     parser.add_argument("--num_trials", type=int, default=10)
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
     parser.add_argument("--pipeline_parallel_size", type=int, default=1)
+    parser.add_argument("--server", action="store_true")
     args = parser.parse_args()
     if args.model_shortname == "both":
         args.model_shortname = "qwen"
@@ -51,20 +103,6 @@ def main_with_args(args):
             args.input_file = args.input_file.replace(".jsonl", "_graded_easy.jsonl")
             output_file = args.input_file.replace(".jsonl", "_graded_medium.jsonl")
         
-    hf_overrides = {
-        "use_cache": True
-    }
-    # Load model with vLLM - uses tensor parallelism automatically
-    llm = LLM(
-        model=model_name,
-        tensor_parallel_size=args.tensor_parallel_size,
-        pipeline_parallel_size=args.pipeline_parallel_size,
-        trust_remote_code=False,
-        dtype="float16",
-        hf_overrides=hf_overrides,
-        # enable_chunked_prefill=True,
-        # max_num_batched_tokens=8192,
-    )
     
     # Prepare all prompts at once for batching
     lines = [json.loads(line) for line in open(args.input_file, "r")]
@@ -85,15 +123,15 @@ def main_with_args(args):
         for _ in range(args.num_trials):
             prompts.append(floatify(line["question"]))
     
-    # Configure sampling parameters
-    sampling_params = SamplingParams(
-        temperature=0.7,
-        top_p=0.9,
-        max_tokens=10000
-    )
-    
-    # Process all prompts in an optimized way
-    outputs = llm.generate(prompts, sampling_params)
+    if args.server:
+        client = OpenAI(
+            base_url="http://localhost:8000/v1",
+            api_key="token-abc123",
+        )
+        outputs = do_inference_in_server(client, model_name, prompts)
+    else:
+        outputs = do_inference_in_process(args, model_name, prompts)
+        generated_texts = [output.outputs[0].text.strip() for output in outputs]
 
 
     with open(output_file, "w") as f, open(output_file.replace(".jsonl", "_verbose_output.jsonl"), "w") as f_debug:
@@ -104,9 +142,7 @@ def main_with_args(args):
             question = line["question"]
             num_correct = 0
             for trial_idx in range(args.num_trials):
-                output = outputs[line_idx * args.num_trials + trial_idx]
-                
-                generated_text = output.outputs[0].text.strip()
+                generated_text = generated_texts[line_idx * args.num_trials + trial_idx]
                 extracted_answer = extract_last_float(generated_text)
                 verbose_output[f"generated_text_{trial_idx}"] = generated_text
                 verbose_output[f"extracted_answer_{trial_idx}"] = extracted_answer

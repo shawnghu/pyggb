@@ -11,7 +11,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the full geometry pipeline")
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
     parser.add_argument("--generator_class", type=str, default="ClassicalGenerator", help="Generator class to use")
-    parser.add_argument("--generator_command_types", type=str, default="base", help="Command types to use")
+    parser.add_argument("--generator_command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "angle", "all"], default=["all"])
     parser.add_argument("--num_generator_commands", type=int, default=25, help="Number of commands to generate")
     parser.add_argument("--multiprocess", action="store_true")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")

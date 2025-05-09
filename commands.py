@@ -620,7 +620,7 @@ def chord_c(circle: gt.Circle) -> gt.Segment:
         p2 = point_c(circle)
     return segment_pp(p1, p2)
 """
-    
+
 # Not special. Needs surrounding logic to sample the actual diagonal,
 # due to the constraints from command.apply() on the output semantics of this function.
 # This function simply has a different name from segment_pp so it can be translated differently.

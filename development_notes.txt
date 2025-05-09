@@ -1,10 +1,106 @@
-where i am now:
-[x] just solved a problem with the generator throwing in the middle of commands, causing incorrect stuff to be reconstructed
-[x] need to solve discriminator still throws errors due to keyerror due to sometimes ill-constructed command files
-    [x] solved
+gpt-4o-mini-high: ensure eval script does not use any tools
+claude 3.7-reasoning
+gemini 2.5-pro (need to get key)
 
-(should have done some unit testing?)
+
+10:00: gather thoughts. look into zebralogic
+11:30: hopefully zebralogic is finished. write the DP programs
+12:00: hopefully have some traction on DP programs
+2:30: hopefully mostly done
+3:00: hopefully have a dataset to present. still need to calibrate difficulty to qwen performance. HAVE A PLAN FOR WHEN YOU ARE EVALUATING. DO NOT REST NEEDLESSLY
+3:15: clean up perpendicular intersection problems
+3:30: begin working on my problems. start with polygon and basic.
+4:30: optimistically, polygon and basic will be done and all issues with those wrapped up. begin evaluation on triangle and circle-line problems
+
+DO NOT DECLARE VICTORY TOO EARLY. only done when you are done.
+
+
+
+
+
+
+
+check frontier model performance on 12-gon problems (for fun):
+
+1. Suppose you have a 9-gon, with vertices numbered 1 through 9 in counterclockwise order.
+
+Draw the diagonal from vertex 1 to vertex 5. Then draw the diagonal from vertex 3 to vertex 8. Then, rotate the entire setup, including the constructed diagonals, 5 vertices counterclockwise (so that vertex 1 ends up where vertex 6 was), and superimpose it on the original (so that the resulting diagram contains both the original diagonals and the rotated versions of the diagonals). The original 9-gon will be partitioned into a collection of smaller polygons. How many such polygons will there be? (Only count the "smallest" polygons, i.e, those that do not have any of the diagonals running through them; this is not a combinatorics problem.) 
+(answer: 9)
+
+2.  That's correct. Of these, how many will have exactly 4 sides? 
+(answer: 6)
+
+3.  Find the number of unique rectangles that can be formed inside a fixed regular dodecagon (12-gon) where each side of the rectangle lies on either a side or a diagonal of the dodecagon.
+
+Note that it is possible for a rectangle to be contained within another rectangle, and that the rectangles may not extend beyond the boundaries for the 12-gon. 
+(answer: 315)
+
+-deepseek-r1:
+1. correct, 2. incorrect (confused the whole way)
+
+-claude 3.7-reasoning:
+1. correct only the 2nd time, 2. incorrect twice (mistakes, using valid method of analysis of planar graph, i think does not generalize to harder questions)
+3. incorrect (but valid reasoning about the classes of line orientations, and identifying perpendicular pairs)
+
+-gpt-4o:
+1. correct, 2. correct, 3. correct (using python and shapely lib)
+
+-gemini-2.5-pro:
+1. correct, 2. correct, 3. incorrect (some valid reasoning about the classes of line orientations, mistakes made later on)
+
+
+Note shapely does what you wanted for the polygon intersection problems.
+
+When eval-ing on my exploratory problems, need to ensure that the problems are well-founded
+
+Explorative
+For all subfields for this, the deliverable is a set of data:
+1000 train/"test-in", i.e, val, from the same distribution. they should be parameterized by some factor which means that qwen-32b-Instruct has a ~10 percent success rate at them.
+so that we can eval fine tuning performance on them, and also eval performance out of the distribution.
+We need one of these for each geometry subfield.
+Best if I can classify the problems into ~6 categories instead of just the 4-ish I have. (Just split by classification type)
+    - fix angles by maybe only rotating by quantities that are interesting
+    - fix measure angle also by only measuring an angle when it is interesting, and also not pi
+
+Also need multiple logic domains. There is zebra-logic also.
+
+Compositional
+(what is the format these things are expected to be found in?)
+[x] Geometry-combinatorics thing: make custom dataset for geometry FT
+- test set made by hand
+    - still have more ideas if needed: hexagon grid
+ 
+- Remember "circle growing" or "shape moving" type problems that cause the other constraints on a problem to change. "Five good templates" or similar.
+
+- Third compositional problem is needed. We want to not have to make a new training set for this, so ideally we take advantage of circle and line constructions to form the eval set.
+Spiral problem is likely another problem; be clear on how this breaks down
+
+
+Transformational
+- implement logic problems, i.e, gridworld stuff
+- Implement geometry circles problem/write variations
+
+
+Other (project related remarks)
+Need to generate eval set.
+Need to understand the structure of the existing repo a bit better-- what is
+Should create a visualizer. Or no matter what, we need a diagram of some kind to explain the three categories.
+Best if a similar problem can be used to explain all three. To that end, I think making a circles-and-lines type diagram would be good,
+
+
+
+formatting  the code is a more trivial matter, just has to look good for submission
+
+
+
+class of rectangles for the polygon rotation problems (simply check for right angles)
+
+create polygon rotation problems
+instead of just asking how many polygons, ask how many 4-gons or how many triangles or whatever
+
+
 (more like instead of writing tests, should just make more atomic changes)
+(maybe should've asked cursor to do a more test-driven development approach early on)
 (also should do things more breadth-first)
 
 
@@ -28,13 +124,29 @@ vim keys:
 - grade problems by the 100s to see output difficulty distribution
 - visualize problems
 
+- can do 
+
 - high level agenda:
 - fix (some of) the dumb things
 [x] do restricted problem generation
 - fix dumb things in iteration if needed
     [x] ban making more than one point that is just floating
     [x] ban making point at fixed distance from another point after too long
+
+
+list of dumb things:
+- still have single points floating? (probably due to triangle actually constructing a point)
+- still have line translated where a segment already exists
+- too often measure angles and rotate angles (but this is the "all" distribution").
+- measure angle of three collinear points
+- ask for property of thing that was simply constructed by reflection, e.g, mirror_cl
+- ask for distance between two points when one point was rotated about the other
+- ask for intersection of two lines when one was the perpendicular bisector of the other, so we're just asking for the midpoint
+
 - add more commands(?)
+    - fix measure angle for general problems.
+        - eliminate angle category, rotate_by_equivalent_angle command
+    - construct point at distance along line (???)
     - build triangle by fiat (return the points)
         - equilateral triangle
         - triangle with fixed lengths
@@ -42,79 +154,25 @@ vim keys:
             - too hard
     - circle chords
         - chord of fixed length
-        - chord orthogonal to existing line
+        - chord parallel to existing chord (maybe)
+        [x] chord orthogonal to existing line (not possible)
     - internally tangent circle
     - externally tangent circle
     - circle tangent to two others? (has the problem of always returning two circles if they are externally tangent. but can do a randomizer.)
-    - triangle area
+    [x] triangle area
+    - check each of the 5 datasets for dumbness
 
-
-list of dumb things:
-- point_at_distance_along_line actually is very important, so we need to fix its ambiguity
-
+- generally speaking, review problems
 
 - sometimes things only rely in any meaningful way on something constructed way down the line
 - note most functions only return one point, so this point should be meaningful in some way to the rest of the problem beforehand.
 - functions which only take one input are possibly pretty bad?
 
-- we can restore the degenerate point logic in the command sampling. 
 
-- and then, fix the translations so they're less ugly.
-
-
-aime questions are all in the passive voice, and do use stuff like "Let" or simply assert the existence of stuff from the jump.
-
-
-[d] generalize the parameterization logic for the exploratory geometry constructor.
-    [d] see if all reasonable generators are actually just variants of the main one by params.
-[x] move all the stuff into a single pipeline script
-- and integrate with yiyou's repo
-    [d] refactor the pipeline so that knowledge is carried forward. in particular, commands can easily be graded at construction time, and also translated directly from Command object. (Great opportunity for Cursor composer.)
-        - this also is not actually needed. in particular, there is no benefit from abstracting out measure_test.py.
-        [x] But the Construction parser can indeed be used for the translator, to derive types for everything. (Made the logic for translator incredibly simpler)
-- improve the wording of problems to be more like AIME problems
-    [x] read some AIME problems to get a sense of these
-    - heuristics for operating on lines
-    [x] rewording individual commands (particularly construction of individual points)
-
-[x] reduce the frequency of construction of polygons.
-
-[x] special case constructions of polygons and triangles in translation (handled automatically by ident logic)
-    [x] simply ban polygon construction more than once
-    [x] polygons are constructed at a fixed angle relative to the axes, which is a mistranslation. rotate polygon by a random amount.
-    [x] the same general concept means functions that return more than one output have been banned
-    [x] need to fix big random float angles
-
-- improve problem quality:
-    - look at the distribution of sampled commands more closely. some problems seem to be somewhat degenerate
 
 
 - vim matters:
-- ctrl-i, ctrl-w, ctrl-n clash pretty badly with things i often want to do (composer, close window)
-    - :q closes window just fine
-- does typing with vim keybinds actually make me noticeably faster?
-- if so, it's worth it to invest in
-- if not, fuck it
-
-
-- guiding principle for design: try to make this thing a tool that actually is useful for generating geometry problems. maybe is useful in itself.
-
-(other datasets may be easier of or lower quality)
-
-- develop "problem categories": (note here the emphasis on being able to perform "controlled" FT experiments)
-    - triangles and related
-    - circles and related
-    - lines and points and intersections and orthogonals
-    - other? polygons?
-    - other other?
-    - "coordinate"?
-
-- solve my vimrc problem
-- solve my left/right arrow key problem, more specifically
-
-- evaluate problem difficulty distribution better
-    - (just use the grader)
-    - build better automated tools
+- ctrl-i, ctrl-n clash pretty badly with things i often want to do (composer, make new file)
 
 - design a "compositional" geometry + "algebra" problem.
     - note the design constraints: 
@@ -122,11 +180,12 @@ aime questions are all in the passive voice, and do use stuff like "Let" or simp
     - ideally, should make use of our existing capabilities to some extent...
 
 - split exploratory geometry problems into categories for construction
-- build the new geometry "visualization" problem dataset
+[x] build the new geometry "visualization" problem dataset
 
-- help design number theory problems/training set
+[d] help design number theory problems/training set
     - a product of three primes property?
 
+- guiding principle for design: try to make this thing a tool that actually is useful for generating geometry problems. maybe is useful in itself.
 
 
 thinking out loud here:
@@ -140,18 +199,6 @@ so we want to extend it to be general-purpose
 
 think of uses for deep research and etc.
 
-
-
-
-- note construction.render() function for visualizing the polygon intersection problems, later
-
-- later answer what yiyou wondered about whether o4 or r1 breaks first on these long problems
-
-
---REMEMBER to evaluate openthinker. it doesn't seem much better than qwen. 
-
-- can improve feedback times on inference for small datasets by keeping a model loaded in memory using vllm server
-    - vllm serve "open-thoughts/OpenThinker-32B" --tensor-parallel-size=1 --disable-log-requests --enable-chunked-prefill --enable-prefix-caching
 
 - generally improve sampling heuristics, as needed, for variety.
 - would be good if we could somehow construct the set of points satisfying a predicate. but that seems quite advanced and somewhat out of the reach of this project...
@@ -185,6 +232,30 @@ translations:
     -instead of "A point G is placed so that it is 5 units away from point N in any direction." maybe  just "G is constructed so that NG = 5". Even worse if N was not constructed by important means, then it's just "NG = 5".
 
 - distribution of problems. Triangles can be constructed more easily. Somehow still too many polygons are constructed
+
+
+[d] generalize the parameterization logic for the exploratory geometry constructor.
+    [d] see if all reasonable generators are actually just variants of the main one by params.
+[x] move all the stuff into a single pipeline script
+- and integrate with yiyou's repo
+    [d] refactor the pipeline so that knowledge is carried forward. in particular, commands can easily be graded at construction time, and also translated directly from Command object. (Great opportunity for Cursor composer.)
+        - this also is not actually needed. in particular, there is no benefit from abstracting out measure_test.py.
+        [x] But the Construction parser can indeed be used for the translator, to derive types for everything. (Made the logic for translator incredibly simpler)
+- improve the wording of problems to be more like AIME problems
+    [x] read some AIME problems to get a sense of these
+    - heuristics for operating on lines
+    [x] rewording individual commands (particularly construction of individual points)
+
+[x] reduce the frequency of construction of polygons.
+
+[x] special case constructions of polygons and triangles in translation (handled automatically by ident logic)
+    [x] simply ban polygon construction more than once
+    [x] polygons are constructed at a fixed angle relative to the axes, which is a mistranslation. rotate polygon by a random amount.
+    [x] the same general concept means functions that return more than one output have been banned
+    [x] need to fix big random float angles
+
+- improve problem quality:
+    - look at the distribution of sampled commands more closely. some problems seem to be somewhat degenerate
 
 
 **************************************************************88
