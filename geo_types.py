@@ -18,8 +18,15 @@ def rotate_vec(vec, alpha):
     return cpx_to_a(np.exp(alpha*1j) * a_to_cpx(vec))
 
 class Point:
-    def __init__(self, a):
-        self.a = np.array(a)
+    def __init__(self, a, x = None):
+        if x is not None:
+            self.x = a
+            self.y = x
+            self.a = np.array([a, x], dtype=np.float64)
+        else:
+            self.a = np.array(a, dtype=np.float64)
+            self.x = self.a[0]
+            self.y = self.a[1]
     def __repr__(self): return "Point({}, {})".format(self.a[0], self.a[1])
     def draw(self, cr, corners):
         cr.arc(self.a[0], self.a[1], 3, 0, 2*np.pi)
@@ -278,7 +285,9 @@ class Circle:
             self.c = center.a
         else:
             self.c = center
+        self.center = Point(self.c)
         self.r = r
+        self.radius = r
         self.r_squared = self.r**2
 
     def translate(self, vec):

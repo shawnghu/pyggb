@@ -29,7 +29,7 @@ def process_file_contents(filename: str, contents: str, answer: str, output_dir:
     return json.dumps({"question": problem, "answer": answer, "hash": hash, "original_filename": filename, "stats": stats})
 
 
-def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes: Dict[str, bool] = {}, max_workers: int = 4, sequential: bool = False, translator_type: str = "base") -> None:
+def process_timestamp_dirs(args: argparse.Namespace) -> None:
     """
     Search the 'passed' directory for subdirectories that look like timestamps
     and process their contents if they come after the specified timestamp.
@@ -40,17 +40,25 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
         hashes: Dictionary of file hashes that have already been processed
         max_workers: Maximum number of parallel workers to use
     """
+    if args.hash_check:
+        hashes = read_hashes(args.output_dir)
+    else:
+        hashes = {}
     passed_dir = "passed"
     
     # Get all subdirectories that look like timestamps
-    timestamp_dirs = []
-    for item in os.listdir(passed_dir):
-        item_path = os.path.join(passed_dir, item)
-        if os.path.isdir(item_path) and item.isdigit():
-            timestamp = int(item)
-            if after is None or timestamp >= after:
-                timestamp_dirs.append((timestamp, item_path))
-    
+    if args.interpret_timestamp_as_after:
+        timestamp_dirs = []
+        for item in os.listdir(passed_dir):
+            item_path = os.path.join(passed_dir, item)
+            if os.path.isdir(item_path) and item.isdigit():
+                file_ts = int(item)
+                if args.timestamp is None or file_ts >= args.timestamp:
+                    timestamp_dirs.append((file_ts, item_path))
+    else:
+        timestamp_dirs = [(args.timestamp, os.path.join(passed_dir, str(args.timestamp)))]
+
+        
     # Sort directories by timestamp
     timestamp_dirs.sort()
     
@@ -69,30 +77,29 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
             filename = os.path.basename(file_path)
             contents = open(file_path, 'r').read()
             hash = hashlib.sha256(contents.encode()).hexdigest()
-            if hash in hashes:
+            if args.hash_check and hash in hashes:
                 continue
             for line in answer_lines:
                 if line.startswith(filename):
                     answer = line.split(" ")[1]
                     break
-            all_tasks.append((f"{dir_path}/{filename}", contents, answer, output_dir, hash, translator_type))
+            all_tasks.append((f"{dir_path}/{filename}", contents, answer, args.output_dir, hash, args.translator_type))
     
-    if translator_type == "base":
+    if args.translator_type == "base":
         name_extension = "mechanically_translated"
-    elif translator_type == "missing_angle":
+    elif args.translator_type == "missing_angle":
         name_extension = "missing_angle"
     else:
-        raise ValueError(f"Invalid translator type: {translator_type}")
-    output_file = os.path.join(output_dir, f"{global_timestamp}_{name_extension}.jsonl")
+        raise ValueError(f"Invalid translator type: {args.translator_type}")
 
     all_problem_json_strings = []
     # Process all tasks in parallel
-    if sequential:
+    if args.sequential:
         for task in all_tasks:
             problem_json_string = process_file_contents(*task)
             all_problem_json_strings.append(problem_json_string)
     else:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.max_workers) as executor:
             futures = {executor.submit(process_file_contents, *task): task[0] for task in all_tasks}
             for future in concurrent.futures.as_completed(futures):
                 problem_json_string = future.result()
@@ -100,13 +107,18 @@ def process_timestamp_dirs(output_dir: Path, after: Optional[int] = None, hashes
                     continue
                 all_problem_json_strings.append(problem_json_string)
 
+    output_file = os.path.join(args.output_dir, f"{global_timestamp}_{name_extension}.jsonl")
+    if args.output_name:
+        output_file = os.path.join(args.output_dir, f"{args.output_name}")
+    count = 0
     with open(output_file, 'a') as f:
         for problem_json_string in all_problem_json_strings:
             if problem_json_string is None:
                 continue
             f.write(problem_json_string + "\n")
+            count += 1
 
-    print (f"Wrote {len(all_problem_json_strings)} translations to: {output_file}")
+    print (f"Wrote {count} translations to: {output_file}")
 
 
 def read_hashes(output_dir: Path) -> Dict[str, bool]:
@@ -122,10 +134,14 @@ def read_hashes(output_dir: Path) -> Dict[str, bool]:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Process timestamp directories in the 'passed' folder.")
-    parser.add_argument("--after", type=int, default=None, 
-                        help="Only process directories with timestamps after this value")
+    parser.add_argument("--interpret_timestamp_as_after", action="store_true",
+                        help="Interpret timestamp as after this value")
+    parser.add_argument("--timestamp", type=int, default=None,
+                        help="Only process the given timestamp")
     parser.add_argument("--output_dir", type=Path, default=Path("natural_language_problems"), 
                         help="Place to dump translated files.")
+    parser.add_argument("--output_name", type=str, default=None, 
+                        help="Name of the output file.")
     parser.add_argument("--nohashcheck", action="store_false", dest="hash_check",
                         help="Disable hash checking")
     parser.add_argument("--max_workers", type=int, default=16,
@@ -138,8 +154,7 @@ def parse_args():
     return args
 
 def main(args) -> None:
-    hashes = read_hashes(args.output_dir) if args.hash_check else {}
-    process_timestamp_dirs(args.output_dir, args.after, hashes, args.max_workers, args.sequential, args.translator_type)
+    process_timestamp_dirs(args)
 
 
 if __name__ == "__main__":

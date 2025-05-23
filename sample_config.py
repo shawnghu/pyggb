@@ -33,9 +33,6 @@ basic_commands = [
     'segment_pp',
     'translate_pv',
     'vector_pp',
-]
-
-angle_commands = [
     'angle_ppp',
     'angular_bisector_ll',
     'angular_bisector_ppp',
@@ -70,6 +67,9 @@ circle_commands = [
     'polar_pc',
     'radius_c',
     'tangent_pc',
+    'externally_tangent_c',
+    'internally_tangent_c',
+    'externally_tangent_cc',
 ]
 
 triangle_commands = [
@@ -82,6 +82,7 @@ triangle_commands = [
     'incircle_t',
     'inradius_t',
     'orthocenter_t',
+    'equilateral_triangle',
     
 ]
 

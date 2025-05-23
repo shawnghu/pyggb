@@ -242,10 +242,11 @@ def intersect_lc(line: gt.Line, circle: gt.Circle) -> List[gt.Point]:
     assert(x_squared > 0)
 
     x = np.sqrt(x_squared)
-    return [
+    intersections = [
         gt.Point(x*line.v + y*line.n + circle.c),
         gt.Point(-x*line.v + y*line.n + circle.c),
     ]
+    return random.shuffle(intersections)
 
 def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> List[gt.Point]:
     center_diff = circle2.c - circle1.c
@@ -263,10 +264,11 @@ def intersect_cc(circle1: gt.Circle, circle2: gt.Circle) -> List[gt.Point]:
     center_deviation = np.sqrt(det)
     center_deviation = np.array(((center_deviation,),(-center_deviation,)))
 
-    return [
+    intersections = [
         gt.Point(center + center_dev)
         for center_dev in center_deviation * 0.5*gt.vector_perp_rot(center_diff) / center_dist_squared
     ]
+    return random.shuffle(intersections)
 
 def intersect_cl(c: gt.Circle, l: gt.Line) -> List[gt.Point]:
     return intersect_lc(l,c)
@@ -437,8 +439,11 @@ def ratio_mm(m1: gt.Measure, m2: gt.Measure) -> gt.Measure:
     return gt.Measure(m1.x / m2.x, m1.dim - m2.dim)
 
 
+'''
+# too much trouble to check
 def rotate_pap(point: gt.Point, angle: gt.Angle, by_point: gt.Point) -> gt.Point:
     return gt.Point(by_point.a + gt.rotate_vec(point.a - by_point.a, angle.angle))
+'''
 
 def rotate_pAp(point: gt.Point, angle_size: gt.AngleSize, by_point: gt.Point) -> gt.Point:
     return gt.Point(by_point.a + gt.rotate_vec(point.a - by_point.a, angle_size.x))
@@ -598,28 +603,20 @@ def polygon_from_center_and_circumradius(num_sides: int, center: gt.Point, radiu
     
     return points + [gt.Polygon(points)]
 
+'''
+# This function was simply more trouble than it was worth.
 def rotate_polygon_about_center_by_equivalent_angle(polygon: gt.Polygon, angle: gt.Angle) -> List[Union[gt.Polygon, gt.Point]]:
     points = []
     for i in range(len(polygon.points)):  
         points.append(rotate_pap(polygon.points[i], angle, polygon.center))
     return points + [gt.Polygon(points)]
+'''
 
 def rotate_polygon_about_center(polygon: gt.Polygon, angle_measure: gt.AngleSize) -> List[Union[gt.Polygon, gt.Point]]:
     points = []
     for i in range(len(polygon.points)):  
         points.append(rotate_pAp(polygon.points[i], angle_measure, polygon.center))
     return points + [gt.Polygon(points)]
-
-"""
-This function was removed because it needs special output semantics like diagonal_p, but is not worth it.
-The points of interest need to also be constructed, in this case, and passed as output.
-def chord_c(circle: gt.Circle) -> gt.Segment:
-    p1: gt.Point = point_c(circle)
-    p2: gt.Point = point_c(circle)
-    while np.isclose(p1.a, p2.a).all():
-        p2 = point_c(circle)
-    return segment_pp(p1, p2)
-"""
 
 # Not special. Needs surrounding logic to sample the actual diagonal,
 # due to the constraints from command.apply() on the output semantics of this function.
@@ -628,3 +625,102 @@ def diagonal_p(p1: gt.Point, p2: gt.Point) -> gt.Segment:
     return segment_pp(p1, p2)
 
         
+
+def externally_tangent_c(new_radius: int, c1: gt.Circle) -> gt.Circle:
+    """Create a circle that is externally tangent to the given circle c1.
+    Returns the new circle and its center point."""
+    # Choose a random direction for the new circle's center
+    direction = gt.random_direction()
+    
+    # Calculate the center position for external tangency
+    # For external tangency, the distance between centers equals the sum of radii
+    center_distance = c1.r + new_radius
+    new_center_coords = c1.c + direction * center_distance
+    new_center = gt.Point(new_center_coords)
+    
+    # Create the new circle
+    new_circle = gt.Circle(new_center_coords, new_radius)
+    
+    return [new_center, new_circle]
+
+def internally_tangent_c(new_radius: int, c1: gt.Circle) -> gt.Circle:
+    """Create a circle that is internally tangent to the given circle c1.
+    Returns the new circle and its center point."""
+    assert(new_radius < c1.r)
+    direction = gt.random_direction()
+    center_distance = c1.r - new_radius
+    new_center_coords = c1.c + direction * center_distance
+    new_center = gt.Point(new_center_coords)
+    new_circle = gt.Circle(new_center_coords, new_radius)
+    return [new_center, new_circle]
+
+def externally_tangent_cc(
+    new_radius: float,
+    c1: gt.Circle,
+    c2: gt.Circle
+) -> Tuple[gt.Point, gt.Circle]:
+    """
+    Create a circle of radius `new_radius` that is externally tangent to both c1 and c2.
+    Returns a randomly chosen solution (center point and circle).
+    """
+    # unit vector from c1 to c2
+    center_distance = np.linalg.norm(c2.c - c1.c)
+    assert np.isclose(center_distance, c1.r + c2.r), "Circles must be externally tangent to each other"
+    p = (c2.c - c1.c) / center_distance
+
+    # curvatures
+    k1 = 1.0 / c1.r
+    k2 = 1.0 / c2.r
+    k3 = 1.0 / new_radius
+
+    # factor in numerator
+    s = 2 * np.sqrt(k1 * k2)
+    weighted_sum = k1 * c1.c + k2 * c2.c
+
+    # two possible centers
+    c_plus  = (weighted_sum + s * p) / k3
+    c_minus = (weighted_sum - s * p) / k3
+
+    # wrap as Point and Circle
+    sol_plus  = (gt.Point(c_plus),  gt.Circle(c_plus,  new_radius))
+    sol_minus = (gt.Point(c_minus), gt.Circle(c_minus, new_radius))
+
+    return random.choice([sol_plus, sol_minus])
+
+def chord_c(length: Union[gt.Measure, int], circle: gt.Circle) -> Tuple[gt.Point, gt.Point, gt.Segment]:
+    """Create a chord of a given length on the circle."""
+    if isinstance(length, gt.Measure):
+        length = length.x
+    assert 0 < length <= 2 * circle.r, "Chord length must be positive and no longer than diameter"
+
+    # Random direction vector
+    direction = gt.random_direction()  # Assume this is a unit 2D vector (np.ndarray)
+
+    # Half of the chord vector
+    half_length = length / 2
+    offset = direction * half_length
+
+    # Pick a point on the circle such that chord lies across this direction
+    # Compute perpendicular offset from the center along direction, maintaining chord endpoints on circle
+    height = np.sqrt(circle.r**2 - half_length**2)
+    midpoint = circle.c + direction * height
+
+    p1 = midpoint - offset
+    p2 = midpoint + offset
+
+    pt1 = gt.Point(p1)
+    pt2 = gt.Point(p2)
+    seg = gt.Segment(pt1, pt2)
+    return pt1, pt2, seg
+    
+# this one is special, can only be sampled first
+def equilateral_triangle(side_length: Union[gt.Measure, int]) -> gt.Triangle:
+    if isinstance(side_length, gt.Measure):
+        side_length = side_length.x
+    assert side_length > 0, "Side length must be positive"
+    pa = gt.Point(np.array([0, 0]))
+    pb = gt.Point(np.array([side_length, 0]))
+    pc = gt.Point(np.array([side_length / 2, side_length * np.sqrt(3) / 2]))
+    return gt.Triangle(pa, pb, pc), pa, pb, pc, gt.Segment(pa, pb), gt.Segment(pb, pc), gt.Segment(pc, pa)
+    
+    

@@ -45,7 +45,7 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
         # gather construction stats here, so it's all in one place
         if "point" in command.name:
             stats["num_raw_points_constructed"] += 1 # including point_at_distance*, not including intersection points
-        if "circle" in command.name: # including incircle, circumcircle
+        if "circle" in command.name or command.name.endswith("_c") or command.name.endswith("_cc"): # including incircle, circumcircle
             stats["num_circles_constructed"] += 1
         if "polygon" in command.name: # including rotate_polygon_about_center
             stats["num_polygons_constructed"] += 1
@@ -86,6 +86,13 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
             idents[command.output_elements[2]] = command.input_elements[1].label + command.input_elements[2].label
             idents[command.output_elements[3]] = command.input_elements[2].label + command.input_elements[0].label
             continue
+        if command.name == "equilateral_triangle":
+            idents[command.output_elements[0]] = command.output_elements[1].label
+            idents[command.output_elements[2]] = command.output_elements[3].label
+            idents[command.output_elements[4]] = command.output_elements[0].label + command.output_elements[1].label
+            idents[command.output_elements[5]] = command.output_elements[1].label + command.output_elements[2].label
+            idents[command.output_elements[6]] = command.output_elements[2].label + command.output_elements[0].label
+            continue
         if command.name == "diagonal_p":
             idents[command.output_elements[0]] = command.input_elements[0].label + command.input_elements[1].label
             continue
@@ -96,12 +103,20 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
             continue
 
         if len(command.output_elements) > 1:
-            # give up entirely
-            # for now, all non-polygon commands that have multiple outputs are not supported
-            # the reason for this is basically that the generator has a consistent way of producing them in a fixed order, but there is no natural translation for this
-            # TODO: handle this, ideally by just randomizing the output order of the command earlier in the pipeline, so that we at least get to save problems that actually are solvable despite the ambiguity.
-            print("Threw out a problem due to multiple outputs")
-            return None, None
+            if 'intersect' in command.name:
+                # fuck it, just remove the extra word here
+                result_lines.append(format_regular_command(command, idents).replace(' are.', '.'))
+                continue
+            elif 'chord_c' in command.name or 'tangent' in command.name:
+                result_lines.append(format_regular_command(command, idents))
+                continue
+            else:
+                # give up entirely
+                # for now, all non-polygon commands that have multiple outputs are not supported
+                # the reason for this is basically that the generator has a consistent way of producing them in a fixed order, but there is no natural translation for this
+                # TODO: handle this, ideally by just randomizing the output order of the command earlier in the pipeline, so that we at least get to save problems that actually are solvable despite the ambiguity.
+                print("Threw out a problem due to multiple outputs")
+                return None, None
         # if no special casing happened up until now, just format the template according to "common" logic
         result_lines.append(format_regular_command(command, idents))
 
@@ -182,5 +197,5 @@ def translate_problem(contents: str, answer: Optional[str] = None) -> Optional[s
     # Combine all translated lines into a coherent problem statement
     if not result_lines:
         return None, None
-    
+    result_lines.append("Express your answer as a decimal number rounded to 2 decimal places.")
     return result_lines, stats

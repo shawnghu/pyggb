@@ -14,7 +14,8 @@ import commands
 import geo_types as gt
 from geo_types import MEASURABLE_TYPES, AngleSize
 from random_constr import Command, Element, ConstCommand
-from sample_config import get_commands, triangle_commands, polygon_commands, circle_commands, angle_commands 
+from translate_utils import invert_pi_expression
+from sample_config import get_commands, triangle_commands, polygon_commands, circle_commands
 
 class Node:
     """A node in the dependency graph representing an Element."""
@@ -199,6 +200,10 @@ class ClassicalGenerator:
             actual_type = type(element.data)
             if self._is_compatible_type(actual_type, required_type):
                 compatible.append(element)
+
+        if required_type == gt.AngleSize or numeric_type:
+            if len(self.command_sequence) > 50:
+                return [] # too many consts near the end of sequences, leading to degen problems where the end of the sequence is the only important part.
         if required_type == gt.AngleSize:
             # construct a new AngleSize
             if angle_biases is None:
@@ -272,26 +277,43 @@ class ClassicalGenerator:
         if label_factory is None:
             label_factory = self._get_unused_identifier
         try:
+            if 'intersect' in cmd_name:
+                l1_constructed_by = input_elements[0].command
+                l2_constructed_by = input_elements[1].command
+                if 'orthogonal' in l1_constructed_by.name or 'orthogonal' in l2_constructed_by.name or 'bisector' in l1_constructed_by.name or 'bisector' in l2_constructed_by.name or 'tangent' in l1_constructed_by.name or 'tangent' in l2_constructed_by.name:
+                    # we are trying to find the intersection of two lines, but likely one of them was constructed by being put through the other...
+                    return False, None
             command = Command(cmd_name, input_elements, label_factory=label_factory, label_dict=self.identifiers)
             command.apply()
             failed_command = False
             for output_elem in command.output_elements:
                 try:
                     if isinstance(output_elem.data, gt.Line):
-                        key = (tuple(output_elem.data.n), output_elem.data.c)
-                        if key in self.all_lines: # don't make two overlapping lines
-                            break
+                        n = output_elem.data.n
+                        c = output_elem.data.c
+                        key = (tuple(n), c)
+                        for other_key in self.all_lines: # don't make two overlapping lines
+                            other_n, other_c = other_key    
+                            if np.linalg.norm(n - other_n) < 1e-4 and np.linalg.norm(c - other_c) < 1e-4:
+                                failed_command = True
+                                break
+                            if np.linalg.norm(-n - other_n) < 1e-4 and np.linalg.norm(-c - other_c) < 1e-4:
+                                failed_command = True
+                                break
                         self.all_lines[key] = True
                     if isinstance(output_elem.data, gt.Point):
                         key = tuple(output_elem.data.a)
-                        if key in self.all_points:
-                            failed_command = True
-                            break
+                        for other_key in self.all_points:
+                            if np.isclose(key[0], other_key[0]) and np.isclose(key[1], other_key[1]):
+                                failed_command = True
+                                break
                         self.all_points[key] = True
                     if isinstance(output_elem.data, gt.Circle):
                         key = (tuple(output_elem.data.c), output_elem.data.r)
-                        if key in self.all_circles:
-                            break
+                        for other_key in self.all_circles:
+                            if np.isclose(key[0][0], other_key[0][0]) and np.isclose(key[0][1], other_key[0][1]) and np.isclose(key[1], other_key[1]):
+                                failed_command = True
+                                break
                         self.all_circles[key] = True
                     if isinstance(output_elem.data, gt.Triangle):
                         key = tuple(sorted((output_elem.data.a, output_elem.data.b, output_elem.data.c), key=lambda x: x.__repr__())) # sort by string representation to make the key invariant to the order of the points
@@ -300,7 +322,7 @@ class ClassicalGenerator:
                             break
                         self.all_triangles[key] = True
                 except Exception as e:
-                    # traceback.print_exc()
+                    traceback.print_exc()
                     pdb.set_trace() # this one really isn't supposed to happen
             if failed_command:
                 for output_elem in command.output_elements:
@@ -322,6 +344,15 @@ class ClassicalGenerator:
         command_names = list(self.available_commands.keys())
         if not self.made_triangle_already and "triangle_ppp" in command_names:
             command_names.append('triangle_ppp') # double the probability of triangle construction
+        # only sample equilateral triangle at the beginning of the sequence, since it's pretty weird to construct 3 points by fiat with no relation to anything else, kind of like polygon...
+        if len(self.command_sequence) == 0:
+            if 'equilateral_triangle' in command_names and random.random() < 0.0: # disabled for now
+                self.command_sequence = []
+                self.dependency_graph = DependencyGraph()
+                self.identifiers = {}
+                yield 'equilateral_triangle'
+            else:
+                yield 'point_'
         random.shuffle(command_names)
         
 
@@ -341,7 +372,6 @@ class ClassicalGenerator:
                 continue
             if 'power_' in cmd_name:
                 continue
-
             # this one is boring, since if you get a number out of something, you can't get anything more useful out of it, and if have have a polygon, you always have its circumradius, so you always have its area.
             if cmd_name == 'area_P':
                 continue
@@ -354,6 +384,8 @@ class ClassicalGenerator:
             if cmd_info['return_type'] == gt.Boolean:
                 continue
 
+            if cmd_name == 'equilateral_triangle' and len(self.command_sequence) > 1:
+                continue
 
             if cmd_name == 'point_pm' and len(self.command_sequence) > 10:
                 continue
@@ -445,11 +477,6 @@ class ClassicalGenerator:
 
     def generate_construction(self, num_commands: int = 5) -> List[Command]:
         """Generate a sequence of commands to form a valid construction."""
-        # Start with a point, since that's usually necessary
-        success, command = self._try_apply_command('point_', [])
-        self.command_sequence.append(command)
-        self._update_dependency_graph(command)
-
         while len(self.command_sequence) < num_commands:
             # Sample a command that can be executed
             command = self._execute_new_command()
@@ -460,7 +487,48 @@ class ClassicalGenerator:
         
         return self.command_sequence
 
-    def compute_longest_construction(self, j):
+    def prune_construction(self, min_num_commands: int = 8):
+        """
+        Prune the construction to include only the commands needed to construct the longest quantity. Do this to make it faster to produce longer constructions.
+        """
+        target_node = max(self.dependency_graph.nodes.values(), key=lambda node: node.ancestor_count)
+        required_commands = self.find_necessary_commands(target_node)
+
+        self.pruned_command_sequence = required_commands
+
+        #reset the dependency graph
+        self.dependency_graph = DependencyGraph()
+        for command in self.pruned_command_sequence:
+            self._update_dependency_graph(command)
+        
+        self.identifiers = {}
+        for command in self.pruned_command_sequence:
+            for output_elem in command.output_elements:
+                self.identifiers[output_elem.label] = output_elem.label
+
+    def find_necessary_commands(self, target_node: Node):
+        """
+        Find the commands needed to construct the target node.
+        """
+        required_commands = set()
+        visited = set()
+
+        def dfs(node):
+            if node.element.label in visited:
+                return
+            visited.add(node.element.label)
+            for parent in node.parents:
+                dfs(parent)
+            if node.command:
+                required_commands.add(node.command)
+        
+        dfs(target_node)
+        # Convert to list and sort by original command order
+        command_order = {cmd: i for i, cmd in enumerate(self.command_sequence)}
+        ordered_commands = sorted(required_commands, key=lambda cmd: command_order.get(cmd, float('inf')))
+        return ordered_commands
+
+    def compute_longest_construction(self, j, min_num_commands: int = 8):
         """
         Find the measurable quantity with the most ancestors and create a pruned
         construction sequence that includes only the commands needed to construct it.
@@ -479,45 +547,51 @@ class ClassicalGenerator:
                 return False
             # Find the measurable quantity with the most ancestors
             target_node = max(measurable_nodes, key=lambda node: node.ancestor_count)
+            if target_node.command.name == 'chord_c' or target_node.command.input_elements[0].command.name == 'chord_c':
+                # degenerate construction, chord is constructed by length, and we are either measuring it directly or one of the points that came out of it
+                measurable_nodes.remove(target_node)
+                continue
             if target_node.command.name == 'radius_c':
                 radius_command = target_node.command
                 radius_found_by = radius_command.input_elements[0].command.name
-                if radius_found_by == 'circle_pp' or radius_found_by == 'circle_pm':
+                if radius_found_by in ('circle_pp', 'circle_pm', 'mirror_cp', 'mirror_cl') or 'tangent' in radius_found_by:
                     # degenerate construction, we started with the radius, contructed a circle, and then measured the radius.
                     measurable_nodes.remove(target_node)
                     continue
             if target_node.command.name == 'distance_pp' or target_node.command.name == 'segment_pp':
-                dist_names = ('point_pm', 'point_at_distance_along_line')
+                inputs = target_node.command.input_elements
+                for input_order in ((inputs[0], inputs[1]), (inputs[1], inputs[0])):
+                    p2_constructed_by = input_order[1].command
+                    if (p2_constructed_by.name == 'mirror_pp' and p2_constructed_by.input_elements[1] == input_order[0]) \
+                    or ('rotate' in p2_constructed_by.name and p2_constructed_by.input_elements[2] == input_order[0]):
+                        # degenerate construction, we measured a mirrored/rotated point's distance, which is the same distance.
+                        measurable_nodes.remove(target_node)
+                    continue
+                dist_names = ('point_pm', 'point_at_distance_along_line', 'point_c', 'translate_pv')
                 if target_node.command.input_elements[0].command.name in dist_names or target_node.command.input_elements[1].command.name in dist_names:
                     # degenerate construction, we started with the distance, constructed a point, and then measured the distance.
                     # strictly speaking we need to check that the other arg is the other point in distance_pp, but i don't care, we can throw away some extras.
                     measurable_nodes.remove(target_node)
                     continue
+            if target_node.command.name == 'angle_ppp':
+                if not 'pi' in invert_pi_expression(target_node.element.data.angle):
+                    measurable_nodes.remove(target_node)
+                    continue
+                if np.isclose(target_node.element.data.angle, np.pi): # degenerate angle, things lie on a straight line...
+                    measurable_nodes.remove(target_node)
+                    continue
+                if np.isclose(target_node.element.data.angle, np.pi/2): # probably constructed explicitly via perpendicular line, so kind of stupid
+                    measurable_nodes.remove(target_node)
+                    continue
+                p3_constructed_by = target_node.command.input_elements[2].command
+                p1_constructed_by = target_node.command.input_elements[0].command
+                if 'rotate' in p1_constructed_by.name or 'rotate' in p3_constructed_by.name:
+                    # this condition isn't strict enough, but basically paranoidly remove dumb angle constructions
+                    measurable_nodes.remove(target_node)
+                    continue
             break
-        # Collect all commands needed for this node using DFS   
-        required_commands = set()  # Use a set to avoid duplicates
-        visited = set()
         
-        def dfs(node):
-            if node.element.label in visited:
-                return
-                
-            visited.add(node.element.label)
-            
-            # First visit all parents (reversed DFS)
-            for parent in node.parents:
-                dfs(parent)
-                
-            # Then add this node's command if it exists
-            if node.command:
-                required_commands.add(node.command)
-        
-        # Start DFS from the target node
-        dfs(target_node)
-        
-        # Convert to list and sort by original command order
-        command_order = {cmd: i for i, cmd in enumerate(self.command_sequence)}
-        ordered_commands = sorted(required_commands, key=lambda cmd: command_order.get(cmd, float('inf')))
+        ordered_commands = self.find_necessary_commands(target_node)
 
         # Add a measure command for the target node
         # Create a new measure command for the target element
@@ -525,6 +599,16 @@ class ClassicalGenerator:
         measure_command.apply()
         self._update_dependency_graph(measure_command)
         ordered_commands.append(measure_command)        
+
+
+        '''
+        # if most recent few commands had a literal arg, it probably caused the problem to be dumb because the end of the sequence is the only important part.
+        for cmd in ordered_commands[-7:]:
+            if isinstance(cmd, ConstCommand):
+                return False
+            if cmd.name == 'translate_pv':
+                return False
+        '''
 
         # reassign identifiers starting from the beginning of the ident pool (shuffled, but with single char idents first),
         # so that the output is more readable
@@ -535,10 +619,12 @@ class ClassicalGenerator:
         # and the element object will be updated, passed around, and have the correct label when it is used as an input element.
         # in fact, trying to rename the input element will fail, because it has already been renamed.
         self.init_identifier_pool()
+        num_nonconst_commands = 0
         for command in ordered_commands:
             if isinstance(command, ConstCommand):
                 command.element.label = self._get_unused_identifier(hidden=True)
                 continue
+            num_nonconst_commands += 1
             if command.name == 'polygon_from_center_and_circumradius':
                 num_sides = command.input_elements[0].data
                 for i in range(num_sides):
@@ -556,7 +642,15 @@ class ClassicalGenerator:
                     ident_will_be_hidden = True
                 for output_elem in command.output_elements:
                     output_elem.label = self._get_unused_identifier(hidden=ident_will_be_hidden)
-        if len(ordered_commands) < 6: # often so short as to be degenerate or uninteresting
+                if command.name == 'equilateral_triangle':
+                    command.output_elements[0].label = self._get_unused_identifier(hidden=True)
+                    command.output_elements[1].label = self._get_unused_identifier(hidden=False)
+                    command.output_elements[2].label = self._get_unused_identifier(hidden=False)
+                    command.output_elements[3].label = self._get_unused_identifier(hidden=False)
+                    command.output_elements[4].label = self._get_unused_identifier(hidden=True)
+                    command.output_elements[5].label = self._get_unused_identifier(hidden=True)
+                    command.output_elements[6].label = self._get_unused_identifier(hidden=True)
+        if num_nonconst_commands < min_num_commands: # often so short as to be degenerate or uninteresting
             return False
 
         # we still need to check for this, because in principle we could always just construct something with only basic commands.
@@ -568,8 +662,6 @@ class ClassicalGenerator:
                 required_interesting_commands.extend(polygon_commands)
             if 'circle' in self.command_types:
                 required_interesting_commands.extend(circle_commands)
-            if 'angle' in self.command_types:
-                required_interesting_commands.extend(angle_commands)
             found = False
             for cmd in ordered_commands:
                 if isinstance(cmd, ConstCommand):
@@ -596,7 +688,7 @@ def write_construction(i, args):
     generator.generate_construction(num_commands=args.num_commands)
     
     # Prune the construction to include only essential commands
-    success = generator.compute_longest_construction(i)
+    success = generator.compute_longest_construction(i, min_num_commands=args.min_num_commands)
     if not success:
         return
     
@@ -612,11 +704,11 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="generated_constructions/", help="Output directory")
     # note as a result of the multiprocessing, this is the number of construction attempts, not the number of constructions actually generated
     parser.add_argument("--count", type=int, default=20, help="Number of constructions to attempt")
+    parser.add_argument("--min_num_commands", type=int, default=8, help="Minimum number of commands in the output sequence")
     parser.add_argument("--max_workers", type=int, default=16, help="Maximum number of threads to use")
     parser.add_argument("--multiprocess", action="store_true", help="use multiprocessing")
-    parser.add_argument("--command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "angle", "all"], default=["all"],
+    parser.add_argument("--command_types", type=str, nargs="+", choices=["polygon", "circle", "triangle", "basic", "all"], default=["all"],
                         help="Types of geometric commands to include")
-    # parser.add_argument("--generator", type=str, default="ClassicalGenerator", help="Generator to use")
     args = parser.parse_args()
     return args
 

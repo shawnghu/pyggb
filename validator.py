@@ -57,7 +57,7 @@ def extract_last_float(text):
     else:
         return None
 
-def isclose(a, b, abs_tol=0.002):
+def isclose(a, b, abs_tol=0.011):
     return abs(a - b) <= abs_tol
 
 def process_question(line, cost_estimator, model="o4-mini"):

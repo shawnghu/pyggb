@@ -30,15 +30,12 @@ def do_inference_in_server(client, model_name, prompts):
         return completion.choices[0].message.content
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-        # Submit all prompts to the thread pool
-        future_to_prompt = {
-            executor.submit(process_prompt, prompt, client, model_name): prompt 
-            for prompt in prompts
-        }
+        futures = [executor.submit(process_prompt, prompt, client, model_name) for prompt in prompts]
         
-        # this doesn't work because it doesn't maintain order
-        for future in concurrent.futures.as_completed(future_to_prompt.keys()):
+        # Get results in order
+        for future in futures:
             outputs.append(future.result())
+        
     return outputs
 
 def do_inference_in_process(args, model_name, prompts):

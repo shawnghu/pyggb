@@ -33,7 +33,7 @@ def format_regular_command(command, idents: Dict[Element, str]):
         else: 
             return random.choice([
                 f"{output_labels[0]} is constructed so that {input_labels[0]}{output_labels[0]} = {input_labels[1]}.",
-                f"{output_labels[0]} is placed {input_labels[1]} away from {input_labels[0]}",
+                f"{output_labels[0]} is placed {input_labels[1]} units away from {input_labels[0]}.",
             ])
     if command.name == "point_at_distance":
         return random.choice([
@@ -113,30 +113,35 @@ def format_regular_command(command, idents: Dict[Element, str]):
         ])
     
     # Intersections
+    if 'intersect' in command.name:
+        if len(command.output_elements) > 1:
+            output_str = 's {output_labels[0]} and {output_labels[1]} are'
+        else:
+            output_str = f' {output_labels[0]} is'
+        if command.name == "intersect_lc":
+            return random.choice([
+                f"Point{output_str} the intersection of line {input_labels[0]} and circle {input_labels[1]}.",
+                f"Point{output_str} the intersection of line {input_labels[0]} and circle {input_labels[1]}.",
+            ])
+        if command.name == "intersect_cs":
+            return random.choice([
+                f"Point{output_str} the intersection(s) of circle {input_labels[0]} and segment {input_labels[1]}.",
+                f"Circle {input_labels[0]} and segment {input_labels[1]} intersect at point{output_str}.",
+            ])
+        if command.name == "intersect_cc":
+            return random.choice([
+                f"Point{output_str} the intersection(s) of circles {input_labels[0]} and {input_labels[1]}.",
+                f"Circles {input_labels[0]} and {input_labels[1]} intersect at point{output_str}.",
+            ])
+        if command.name == "intersect_cl":
+            return random.choice([
+                f"Point{output_str} the intersection(s) of circle {input_labels[0]} and line {input_labels[1]}.",
+                f"Circle {input_labels[0]} and line {input_labels[1]} intersect at point{output_str}.",
+            ])
     if command.name == "intersect_ll":
         return random.choice([
             f"Point {output_labels[0]} is the intersection of lines {input_labels[0]} and {input_labels[1]}.",
             f"Lines {input_labels[0]} and {input_labels[1]} intersect at point {output_labels[0]}.",
-        ])
-    if command.name == "intersect_lc":
-        return random.choice([
-            f"Point {output_labels[0]} is the intersection of line {input_labels[0]} and circle {input_labels[1]}.",
-            f"Line {input_labels[0]} and circle {input_labels[1]} intersect at point {output_labels[0]}.",
-        ])
-    if command.name == "intersect_cs":
-        return random.choice([
-            f"Point {output_labels[0]} is the intersection of circle {input_labels[0]} and segment {input_labels[1]}.",
-            f"Circle {input_labels[0]} and segment {input_labels[1]} intersect at point {output_labels[0]}.",
-        ])
-    if command.name == "intersect_cc":
-        return random.choice([
-            f"Point {output_labels[0]} is the intersection of circles {input_labels[0]} and {input_labels[1]}.",
-            f"Circles {input_labels[0]} and {input_labels[1]} intersect at point {output_labels[0]}.",
-        ])
-    if command.name == "intersect_cl":
-        return random.choice([
-            f"Point {output_labels[0]} is the intersection of circle {input_labels[0]} and line {input_labels[1]}.",
-            f"Circle {input_labels[0]} and line {input_labels[1]} intersect at point {output_labels[0]}.",
         ])
     if command.name == "intersect_lr":
         return random.choice([
@@ -382,6 +387,23 @@ def format_regular_command(command, idents: Dict[Element, str]):
     if command.name == "circumcircle_p":
         return random.choice([
             f"Let {output_labels[0]} be the circumcircle of polygon {input_labels[0]}.",
+        ])
+    if command.name == "externally_tangent_c":
+        return random.choice([
+            f"{output_labels[1]} has center {output_labels[0]} and radius {input_labels[0]} and is externally tangent to circle {input_labels[1]}.",
+        ])
+    if command.name == "internally_tangent_c":
+        return random.choice([
+            f"{output_labels[1]} has center {output_labels[0]} and radius {input_labels[0]} and is internally tangent to circle {input_labels[1]}.",
+        ])
+    if command.name == "externally_tangent_cc":
+        return random.choice([
+            f"{output_labels[1]} has center {output_labels[0]} and radius {input_labels[0]} and is externally tangent to circles {input_labels[1]} and {input_labels[2]}.",
+        ])
+    if command.name == "chord_c":
+        idents[command.output_elements[2]] = f"{output_labels[0]}{output_labels[1]}"
+        return random.choice([
+            f"Chord {output_labels[0]}{output_labels[1]} of circle {input_labels[1]} has length {input_labels[0]}.",
         ])
     raise Exception(f"Unknown command: {command.name}")
     

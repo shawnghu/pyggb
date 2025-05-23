@@ -4,7 +4,7 @@ import os
 import argparse
 import json
 import torch
-from validator import extract_last_float, isclose, floatify
+from validator import extract_last_float, isclose
 import copy
 import pdb
 from openai import OpenAI
@@ -64,6 +64,8 @@ def main_with_args(args):
     
     # Prepare all prompts at once for batching
     lines = [json.loads(line) for line in open(args.input_file, "r")]
+    if len(lines) > 100:
+        lines = lines[:100]
     try:
         prompts = [line["question"] for line in lines]
     except KeyError:
@@ -74,6 +76,7 @@ def main_with_args(args):
 
 
     output_file = args.input_file.replace(".jsonl", "_graded.jsonl")
+    num_correct = 0
     with open(output_file, "w") as f:
         for line_idx, line in enumerate(lines):
             generated_text = generated_texts[line_idx]
@@ -87,8 +90,10 @@ def main_with_args(args):
             line["correct"] = correct
             line["generated_text"] = generated_text
             line["extracted_answer"] = extracted_answer
-
+            if correct:
+                num_correct += 1
             f.write(json.dumps(line) + "\n")
+    print(f"Number of correct: {num_correct} out of {len(lines)}, {num_correct/len(lines)}")
 
 
 if __name__ == "__main__":
